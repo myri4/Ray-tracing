@@ -1,0 +1,277 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{44f63a7f-bb0a-4e78-bf40-7d8d8c8bf44c}</ProjectGuid>
+    <RootNamespace>Elementalworld</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(ProjectDir)common;$(ProjectDir)vendor\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)vendor\Libraries;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediates\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(ProjectDir)common;$(ProjectDir)vendor\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)vendor\Libraries;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediates\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(ProjectDir)common;$(ProjectDir)vendor\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)vendor\Libraries;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediates\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(ProjectDir)common;$(ProjectDir)vendor\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)vendor\Libraries;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediates\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>
+      </PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions />
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>
+      </PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions />
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="common\gl\CubeMap.hpp" />
+    <ClCompile Include="common\Maths\AssimpGLMHelpers.hpp" />
+    <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common\gl\Camera.h" />
+    <ClInclude Include="common\gl\TextureArray.hpp" />
+    <ClInclude Include="common\gl\VertexArray.hpp" />
+    <ClInclude Include="common\GUI\AssetManager.hpp" />
+    <ClInclude Include="common\GUI\Button.hpp" />
+    <ClInclude Include="common\GUI\ParticleSystem.hpp" />
+    <ClInclude Include="common\GUI\Renderer2D.hpp" />
+    <ClInclude Include="common\GUI\Textbox.hpp" />
+    <ClInclude Include="common\Maths\Camera.hpp" />
+    <ClInclude Include="common\gl\Cubemap.h" />
+    <ClInclude Include="common\gl\FrameBuffer.h" />
+    <ClInclude Include="common\gl\FrameBuffer.hpp" />
+    <ClInclude Include="common\gl\glErrors.h" />
+    <ClInclude Include="common\gl\IndexBuffer.h" />
+    <ClInclude Include="common\gl\Shaders.h" />
+    <ClInclude Include="common\gl\Shaders.hpp" />
+    <ClInclude Include="common\gl\Skybox.h" />
+    <ClInclude Include="common\net\message.hpp" />
+    <ClInclude Include="common\net\net_client.hpp" />
+    <ClInclude Include="common\net\net_common.hpp" />
+    <ClInclude Include="common\net\net_connection.hpp" />
+    <ClInclude Include="common\net\net_server.hpp" />
+    <ClInclude Include="common\net\tsqueue.hpp" />
+    <ClInclude Include="common\net\wc_net.hpp" />
+    <ClInclude Include="common\Renderer\Renderer.hpp" />
+    <ClInclude Include="common\Utils\Bits.hpp" />
+    <ClInclude Include="common\wc\Model\Animation.hpp" />
+    <ClInclude Include="common\wc\Model\Bone.hpp" />
+    <ClInclude Include="common\wc\Model\Mesh.hpp" />
+    <ClInclude Include="common\wc\Model\Model.hpp" />
+    <ClInclude Include="common\gl\Text.h" />
+    <ClInclude Include="common\gl\Texture.h" />
+    <ClInclude Include="common\gl\Texture.hpp" />
+    <ClInclude Include="common\gl\VertexArray.h" />
+    <ClInclude Include="common\gl\Buffer.hpp" />
+    <ClInclude Include="common\Maths\Frustum.hpp" />
+    <ClInclude Include="common\Utils\Log.hpp" />
+    <ClInclude Include="common\Utils\Random.hpp" />
+    <ClInclude Include="common\Utilitiess\State.h" />
+    <ClInclude Include="common\Utils\State.hpp" />
+    <ClInclude Include="common\Utils\Time.hpp" />
+    <ClInclude Include="common\Utils\Window.hpp" />
+    <ClInclude Include="common\wc\pch.hpp" />
+    <ClInclude Include="common\wc\Skybox.hpp" />
+    <ClInclude Include="gl\Camera.h" />
+    <ClInclude Include="gl\Cubemap.h" />
+    <ClInclude Include="gl\FrameBuffer.h" />
+    <ClInclude Include="gl\glErrors.h" />
+    <ClInclude Include="gl\IndexBuffer.h" />
+    <ClInclude Include="gl\Shaders.h" />
+    <ClInclude Include="gl\Skybox.h" />
+    <ClInclude Include="gl\Text.h" />
+    <ClInclude Include="gl\Texture.h" />
+    <ClInclude Include="gl\VertexArray.h" />
+    <ClInclude Include="common\Utils\NonCopyable.hpp" />
+    <ClInclude Include="src\Block.h" />
+    <ClInclude Include="common\Maths\Ray.hpp" />
+    <ClInclude Include="src\Engine.h" />
+    <ClInclude Include="src\Application.hpp" />
+    <ClInclude Include="common\Utilitiess\Log.h" />
+    <ClInclude Include="Utils\SFMLCLock.hpp" />
+    <ClInclude Include="Utils\State.h" />
+    <ClInclude Include="src\world\Chunk.h" />
+    <ClInclude Include="Utils\Time.hpp" />
+    <ClInclude Include="vendor\Include\FastNoise\FastNoiseLite.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="config\window.lua" />
+    <None Include="scripts\blocks.lua" />
+    <None Include="scripts\coal_ore.lua" />
+    <None Include="scripts\dead_bush.lua" />
+    <None Include="scripts\green_coral.lua" />
+    <None Include="scripts\iron_ore.lua" />
+    <None Include="scripts\red_flower.lua" />
+    <None Include="scripts\glass.lua" />
+    <None Include="scripts\dirt.lua" />
+    <None Include="scripts\grassblock.lua" />
+    <None Include="scripts\haybale.lua" />
+    <None Include="scripts\leaves.lua" />
+    <None Include="scripts\requirements.lua" />
+    <None Include="scripts\sand.lua" />
+    <None Include="scripts\skybox.lua" />
+    <None Include="scripts\small_grass.lua" />
+    <None Include="scripts\snow.lua" />
+    <None Include="scripts\stone.lua" />
+    <None Include="scripts\water.lua" />
+    <None Include="scripts\wood.lua" />
+    <None Include="scripts\worldGen.lua" />
+    <None Include="scripts\yellow_flower.lua" />
+    <None Include="shaderpacks\default\Renderer2D.glsl" />
+    <None Include="shaderpacks\default\screenShader.glsl" />
+    <None Include="shaderpacks\default\testCompute.glsl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
