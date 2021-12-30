@@ -66,7 +66,10 @@ namespace gl {
 		void SetData(const short* data, const uint32_t& width, const uint32_t& height, const uint32_t& xoffset = 0, const uint32_t& yoffset = 0) const { if (m_RendererID) SetDataMode(data, width, height, xoffset, yoffset, GL_SHORT); }
 		void SetData(const unsigned short* data, const uint32_t& width, const uint32_t& height, const uint32_t& xoffset = 0, const uint32_t& yoffset = 0) const { if (m_RendererID) SetDataMode(data, width, height, xoffset, yoffset, GL_UNSIGNED_SHORT); }
 
-		void Destroy() const { glDeleteTextures(1, &m_RendererID); }
+		void Destroy() {
+			glDeleteTextures(1, &m_RendererID);
+			m_RendererID = 0;
+		}
 
 		void Bind(const uint8_t& textureUnit = 0) const {
 			glBindTextureUnit(textureUnit, m_RendererID);

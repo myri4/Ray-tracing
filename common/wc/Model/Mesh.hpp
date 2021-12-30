@@ -10,77 +10,44 @@
 #define MAX_BONE_INFLUENCE 4
 #define MAX_BONE_WEIGHTS MAX_BONE_INFLUENCE * 25
 
-struct MeshVertex {
-    // position
-    glm::vec3 Position = glm::vec3(0.f);
-    // normal
-    glm::vec3 Normal = glm::vec3(0.f);
-    // texCoords
-    glm::vec2 TexCoords = glm::vec2(0.f);
-
-    //bone indexes which will influence this vertex
-    int m_BoneIDs[MAX_BONE_INFLUENCE] = { -1 };
-
-    //weights from each bone
-    float m_Weights[MAX_BONE_INFLUENCE] = { 0.f };
-
-    MeshVertex() {
-        memset(m_BoneIDs,-1, sizeof(m_BoneIDs));
-        memset(m_Weights, 0, sizeof(m_Weights));
-    }
+struct Vertex {
+    glm::vec2 texCoord = glm::vec2(0.f);
+    alignas(16) glm::vec3 position = glm::vec3(0.f);
+    alignas(16) glm::vec3 normal = glm::vec3(0.f, 1.f, 0.f);
 };
 
+struct ind {
+    alignas(16) uint32_t index;
+
+    ind() {}
+    ind(const uint32_t& Index) : index(Index) {}
+};
 
 namespace wc {
 class Mesh {
 public:
-    // mesh Data
-    gl::Texture diffuseTexture;
-
     // constructor
     Mesh() {}
-    Mesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, const gl::Texture& Textures) { Create(vertices, indices, Textures); }
 
-    void Create(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, const gl::Texture& Textures) {
-        diffuseTexture = Textures;
+    void Create(const std::vector<Vertex>& vertices, const std::vector<ind>& indices) {
+        m_VertexBuffer.Create(vertices.data(), vertices.size() * sizeof(Vertex), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+        m_VertexBuffer.BufferBase(2);
 
-        m_VertexArray.Create();
+        m_IndexBuffer.Create(indices.data(), indices.size() * sizeof(ind), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+        m_IndexBuffer.BufferBase(3);
 
-        m_VertexBuffer.Create(vertices.data(), vertices.size() * sizeof(MeshVertex), 0);
-
-        m_IndexBuffer.Create(indices.data(), indices.size() * sizeof(uint32_t), 0);
-
-        m_VertexArray.AddIndexBuffer(m_IndexBuffer);
-        m_VertexArray.AddVertexBuffer(m_VertexBuffer, sizeof(MeshVertex));
         indexSize = indices.size();
-
-        // set the vertex attribute pointers
-        // vertex Positions
-        m_VertexArray.VertexAttribPointer(0, 3, offsetof(MeshVertex, Position));
-        // vertex normals
-        m_VertexArray.VertexAttribPointer(1, 3, offsetof(MeshVertex, Normal));
-        // vertex texture coords
-        m_VertexArray.VertexAttribPointer(2, 2, offsetof(MeshVertex, TexCoords));
-        // ids
-        m_VertexArray.VertexAttribIntPointer(3, 4, offsetof(MeshVertex, m_BoneIDs));
-        // weights
-        m_VertexArray.VertexAttribPointer(4, 4, offsetof(MeshVertex, m_Weights));
     }
 
-    // render the mesh
-    void Draw() const {
-        // bind appropriate textures
-        diffuseTexture.Bind();
-        // draw mesh
-        m_VertexArray.Bind();
-        Renderer::DrawIndexed(indexSize);
+    void Bind() {
+        m_VertexBuffer.Bind();
+        m_IndexBuffer.Bind();
     }
 
-private:
     uint32_t indexSize = 0;
+private:
     // render data 
-    gl::VertexArray m_VertexArray;
-    gl::IndexBuffer m_IndexBuffer;
-    gl::VertexBuffer m_VertexBuffer;
+    gl::UniformBuffer m_IndexBuffer;
+    gl::UniformBuffer m_VertexBuffer;
 };
 }

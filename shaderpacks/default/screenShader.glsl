@@ -47,6 +47,7 @@ layout (std140, binding = 0) uniform SceneData
 	vec3 cameraPos;
     uint numIndices;
     uint numLights;
+	uint maxBounces;
 };
 
 layout (std140, binding = 1) uniform Lighting
@@ -68,17 +69,22 @@ layout(binding = 0) uniform sampler2D u_Albedo;
 layout(binding = 1) uniform sampler2D u_MaterialInfo;
 layout(binding = 2) uniform sampler2D u_Normal;
 
-bool Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in Triangle tri, out vec2 uv, out float t) {
-	vec3 e1 = tri.b - tri.a;
-	vec3 e2 = tri.c - tri.a;
+bool Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in uint i, inout vec2 uv, inout float t) {
+	vec3 a = vertices[indices[i]].position;
+	vec3 b = vertices[indices[i + 1]].position;
+	vec3 c = vertices[indices[i + 2]].position;
+	vec3 e1 = b - a;
+	vec3 e2 = c - a;
     vec3 crossRDE2 = cross(rayDirection, e2);
     float dotE1CrossRDE2 = 1.f / dot(e1, crossRDE2);
-	uv.x = dot(rayOrigin - tri.a, crossRDE2) * dotE1CrossRDE2;
-	uv.y = dot(rayDirection, cross(rayOrigin - tri.a, e1) * dotE1CrossRDE2);
+	vec3 rOa = rayOrigin - a;
+	vec3 crossROAE1 = cross(rOa, e1);
+	uv.x = dot(rOa, crossRDE2) * dotE1CrossRDE2;
+	uv.y = dot(rayDirection, crossROAE1 * dotE1CrossRDE2);
 
-	t = dot(e2, cross((rayOrigin - tri.a), e1)) * dotE1CrossRDE2;
+	t = dot(e2, crossROAE1) * dotE1CrossRDE2;
 		
-	return !(uv.x < 0.f || uv.x > 1.f || uv.y < 0.f || uv.x + uv.y > 1.f || t <= 0.f);	
+	return !(t <= 0.f || uv.x < 0.f || uv.x > 1.f || uv.y < 0.f || uv.x + uv.y > 1.f);	
 }
 
 const float Epsilon = 1.192092896e-07F;
@@ -124,7 +130,7 @@ float GeometrySchlickGGX(const in float NdotV, const in float roughness)
 	//float nom = NdotV;
 	//float denom = NdotV * (1.f - k) + k;
 	//	   nom   / denom
-	return NdotV / (NdotV - NdotV * k + k);
+	return NdotV / (NdotV * (1.f - k) + k);
 }
 
 vec3 fresnelSchlick(const in float cosTheta, const in vec3 F0)
@@ -241,7 +247,7 @@ vec3 computeIncidentLight(const in vec3 orig, const in vec3 dir, out float mixer
     uint numSamples = 16; 
     uint numSamplesLight = 8; 
     float t0 = 0.f, t1 = 0.f; 
-    float g = 0.76f; 
+    float g = 0.78f; 
 	vec3 sunDirection = lights[0].vector;
 	float tmin = 0.f, tmax = kInfinity;
     if (!raySphereIntersect(orig, dir, atmosphereRadius, t0, t1) || t1 < 0) return vec3(0.f); 
@@ -289,28 +295,9 @@ vec3 computeIncidentLight(const in vec3 orig, const in vec3 dir, out float mixer
 }
 /*sky end*/
 
-bool ShadowCast(vec3 refRayOrigin, vec3 refRayDirection){
-	Triangle testTriangle;
-	float t;	
-	float minT = 1000.f;
-	bool hit = false;
-	for (uint i = 0; i < numIndices; i += 3) {
-		vec2 uv2;
-
-		testTriangle.a = vertices[indices[i]].position;
-		testTriangle.b = vertices[indices[i + 1]].position;
-		testTriangle.c = vertices[indices[i + 2]].position;
-
-		if (Intersection(refRayOrigin, refRayDirection, testTriangle, uv2, t)) 
-			hit = true;
-	}
-
-	return hit;
-}
-
 vec3 ambientColor = vec3(0.03f);
 
-vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
+vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 ref) {
 	vec3 color = vec3(0.f);
 	float minT = kInfinity;
 	uint shapeHit = 0;
@@ -322,10 +309,6 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 
 	for (uint i = 0; i < numIndices; i += 3) {
 		vec2 uv2;
-
-		testTriangle.a = vertices[indices[i]].position;
-		testTriangle.b = vertices[indices[i + 1]].position;
-		testTriangle.c = vertices[indices[i + 2]].position;
 		
 		testTriangle.texCoord3 = vertices[indices[i]].texCoord;
 		testTriangle.texCoord1 = vertices[indices[i + 1]].texCoord;
@@ -333,7 +316,7 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 
 		testTriangle.normal = vertices[indices[i]].normal;
 
-		if (Intersection(refRayOrigin, refRayDirection, testTriangle, uv2, t) && t < minT) {			
+		if (Intersection(refRayOrigin, refRayDirection, i, uv2, t) && t < minT) {			
 			minT = t;
 			uv = uv2;
 			shapeHit = i;
@@ -358,17 +341,20 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 
 		if (dot(refRayDirection, N) > 0.f) N = -N;
 
+		float NdotV = max(dot(N, -refRayDirection), 0.f);
+		float GSNVRoughness = GeometrySchlickGGX(NdotV, roughness);
+
 		// calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
 		// of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
 		vec3 F0 = mix(vec3(0.04f), albedo, metallic);
 
+		const float c = 1.f / 255.f;
 		// reflectance equation
 		vec3 Lo = vec3(0.f);
 		for (uint i = 0; i < numLights; i++)
 		{
 			// calculate per-light radiance
 			vec3 radiance;
-			const float c = 1.f / 255.f;
 			uint color = lights[i].color;
 			radiance.r = float((color & uint(0x000000ff))) * c;
 			radiance.g = float((color & uint(0x0000ff00)) >> 8) * c;
@@ -389,30 +375,27 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 			for (uint i = 0; i < numIndices; i += 3) {
 				vec2 uv2;
 			
-				testTriangle.a = vertices[indices[i]].position;
-				testTriangle.b = vertices[indices[i + 1]].position;
-				testTriangle.c = vertices[indices[i + 2]].position;
-			
-				if (Intersection(p0 + 0.000001 * N, L, testTriangle, uv2, t0)){
+				if (Intersection(p0 + 0.000001 * N, L, i, uv2, t0)){
 					LightHit = true;
 					minT = t0;
 				} 
 			}
 
-			float NdotL = max(dot(N, L), 0.f);
-			float NdotV = max(dot(N, -refRayDirection), 0.f);
-			// Cook-Torrance BRDF
-			float NDF = DistributionGGX(N, H, roughness);
-			float G = GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
-			// fresnelSchlick
-			vec3 F = fresnelSchlick(max(dot(H, -refRayDirection), 0.f), F0);
+			if (!LightHit){
+				float NdotL = max(dot(N, L), 0.f);
+				// Cook-Torrance BRDF
+				//float NDF = DistributionGGX(N, H, roughness);
+				float G = GSNVRoughness * GeometrySchlickGGX(NdotL, roughness) * DistributionGGX(N, H, roughness);
+				// fresnelSchlick
+				vec3 F = fresnelSchlick(max(dot(H, -refRayDirection), 0.f), F0);
 
-			vec3 numerator = NDF * G * F;
-			float denominator = 4.f * NdotV * NdotL + 0.001f; // 0.001 to prevent divide by zero.
-			vec3 specular = numerator / denominator;
+				vec3 numerator = G * F;
+				float denominator = 4.f * NdotV * NdotL + 0.001f; // 0.001 to prevent divide by zero.
+				vec3 specular = numerator / denominator;
 
-			vec3 kD = (1.f - F) * (1.f - metallic); // diffuse
-			Lo += ((kD * albedo / PI + specular) * radiance * NdotL) * float(!LightHit);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+				vec3 kD = (1.f - F) * (1.f - metallic); // diffuse
+				Lo += ((kD * albedo / PI + specular) * radiance * NdotL);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+			}
 		}
 
 		// ambient lighting (note that the next IBL tutorial will replace
@@ -421,6 +404,9 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 		vec3 ambient = ambientColor * ao * albedo;
 
 		color = ambient + Lo;
+		ref = albedo * fresnelSchlickRoughness(NdotV, F0, roughness);
+		refRayOrigin = p0 + 0.000001 * N;
+		refRayDirection = reflect(refRayDirection, N);
 		//color = vec3(5.f, 0.f, 0.f);
 	}
 	else{
@@ -438,12 +424,32 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
     return color;
 }
 
+vec3 Render(const in vec3 rayDirection){
+	vec3 refRayOrigin = cameraPos;
+	vec3 refRayDirection = rayDirection;
+	float blendFactor = 0.f;
+	vec3 color, ref, fil = vec3(1.f);//
+
+	for (uint i = 0; i < maxBounces; i++){
+		vec3 pass = rayTrace(refRayOrigin, refRayDirection, ref); 
+		color += pass * fil;
+
+		fil *= ref;
+	}
+
+	return color;
+}
+
 void main()
 {
     vec2 uv = gl_FragCoord.xy / windowSize;
     vec3 rayDir = normalize(lower_left_corner + uv.x * horizontal - uv.y * vertical - cameraPos);
-    vec3 origin = cameraPos;
-	vec3 result = rayTrace(origin, rayDir);
+	vec3 result = Render(rayDir);
+	
+	// HDR tonemapping
+	result = result / (result + 1.f);
+	// gamma correct
+	result = pow(result, vec3(1.f / 2.2f));  
 
     FragColor = vec4(result, 1.f);
 }

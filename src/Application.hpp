@@ -5,6 +5,7 @@
 #include <glm/matrix.hpp>
 #include "GUI/Textbox.hpp"
 #include "GUI/Button.hpp"
+#include <wc/Model/Model.hpp>
 
 namespace wc {
 
@@ -31,27 +32,9 @@ namespace wc {
 			alignas(16) glm::vec3 cameraPos;
 			uint32_t numIndices = 0;
 			uint32_t numLights = 0;
+			uint32_t maxBounces = 2; // @TODO: remove
 			float Time = 0.f;
 		}sceneData;
-
-		struct Vertex {
-			glm::vec2 texCoord = glm::vec2(0.f);
-			alignas(16) glm::vec3 position = glm::vec3(0.f);
-			alignas(16) glm::vec3 normal = glm::vec3(0.f, 1.f, 0.f);
-		};
-
-		struct Triangle {
-			alignas(16) glm::vec3 a;
-			alignas(16) glm::vec3 b;
-			alignas(16) glm::vec3 c;
-
-			glm::vec2 texCoord1 = glm::vec2(1.f, 0.f);
-			glm::vec2 texCoord2 = glm::vec2(0.f, 1.f);
-			glm::vec2 texCoord3 = glm::vec2(1.f, 1.f);
-
-			alignas(16) glm::vec3 normal = glm::vec3(0.f);
-
-		};
 
 		glm::vec3 CalculateNormal(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
 			return glm::normalize(glm::cross(c - a, b - a));
@@ -106,8 +89,26 @@ namespace wc {
 		//----------------------------------------------------------------------------------------------------------------------
 		void OnInput() override {
 			auto windSize = window.GetSize();
-			if (resized) 
+			if (resized) {
 				Renderer2D::SetProjection(Renderer2D::Get2DProj(windSize));	
+
+				screen.Destroy();
+				scrTexture.Destroy();
+				brightResultTexture.Destroy();
+				gl::TextureProps scrProps;
+				scrProps.SetSize(windSize);
+				scrTexture.Create(scrProps);
+
+				gl::TextureProps brightProps;
+				brightProps.internalFormat = GL_RGBA32F;
+				brightProps.format = GL_RGBA;
+				brightProps.SetSize(windSize);
+
+				brightResultTexture.Create(brightProps);
+
+				screen.Create(window.GetSize().x, window.GetSize().y, scrProps.samples);
+				screen.addTexture(scrTexture);
+			}
 			if (window.hasFocus()) {
 
 			float yaw = glm::radians(camera.Yaw);
@@ -141,6 +142,8 @@ namespace wc {
 				screenShader.Destroy();
 				screenShader.Create("shaderpacks/default/screenShader.glsl");
 			}
+
+			if (Keyboard::isKeyPressed(Keyboard::Key::Y)) lighting[1].vector = camera.Position;
 			if (Keyboard::isKeyPressed(Keyboard::Key::C)) { camera.FOV = 10.f; MouseSensitivity = 18; }
 			else
 			{
@@ -180,21 +183,6 @@ namespace wc {
 			Mouse::SetMousePosition(xt, yt);
 			}
 		}
-		struct ind {
-			alignas(16) uint32_t index0;
-			alignas(16) uint32_t index1;
-			alignas(16) uint32_t index2;
-			alignas(16) uint32_t index3;
-			alignas(16) uint32_t index4;
-			alignas(16) uint32_t index5;
-
-			alignas(16) uint32_t index6;
-			alignas(16) uint32_t index7;
-			alignas(16) uint32_t index8;
-			alignas(16) uint32_t index9;
-			alignas(16) uint32_t index10;
-			alignas(16) uint32_t index11;
-		};
 		//----------------------------------------------------------------------------------------------------------------------
 
 		uint32_t convertColor(const glm::vec4& color) {
@@ -251,7 +239,7 @@ namespace wc {
 			lights.BufferBase(1);
 			lights.Bind();
 
-			Vertex vertices[8];
+			Vertex vertices[120];
 			vertices[0].position = glm::vec3(1, 0.5f, 0);
 			vertices[1].position = glm::vec3(0, 0.5f, 0);
 			vertices[2].position = glm::vec3(0, 0.5f, 1);
@@ -283,41 +271,39 @@ namespace wc {
 			vertexBuffer.Bind();
 
 
-			ind indices = { 0, 1, 2, 2, 3, 0,
-							4, 5, 6, 6, 7, 4
+			ind indices[12] = {
+				0, 1, 2, 2, 3, 0,
+				4, 5, 6, 6, 7, 4
 			};
-			indexBuffer.Create(&indices, sizeof(indices), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+			indexBuffer.Create(indices, sizeof(indices), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
 			indexBuffer.BufferBase(3);
 			indexBuffer.Bind();
 
-			sceneData.numIndices = 12;
+			sceneData.numIndices = ARRAYSIZE(indices);
 
 			Renderer2D::Init();
 			Renderer2D::SetProjection(Renderer2D::Get2DProj(window.GetSize()));
 			addLight(glm::vec3(0.f, 1.f, 0.f), convertColor(glm::vec4(1.f, 1.f, 1.f, 0.f)));
 
-			addLight(camera.Position, convertColor(glm::vec4(0.f, 1.f, 0.f, 1.f)));
+			//addLight(camera.Position, convertColor(glm::vec4(0.f, 1.f, 0.f, 1.f)));
 
 			gl::TextureProps scrProps;
-			scrProps.internalFormat = GL_RGBA32F;
-			scrProps.format = GL_RGBA;
 			scrProps.SetSize(window.GetSize());
-
+			scrTexture.Create(scrProps);
+			scrTexture.GenerateMipMap();
 
 			gl::TextureProps brightProps;
 			brightProps.internalFormat = GL_RGBA32F;
 			brightProps.format = GL_RGBA;
 			brightProps.SetSize(window.GetSize());
 
-			scrTexture.Create(scrProps);
 			brightResultTexture.Create(brightProps);
 
 			screen.Create(window.GetSize().x, window.GetSize().y, scrProps.samples);
 			screen.addTexture(scrTexture);
-			gl::load("assets/dull-brass-ue/dull-brass_albedo.png", u_Albedo);
-			gl::load("assets/dull-brass-ue/pbr_output.png", u_MaterialInfo);
-			gl::load("assets/dull-brass-ue/dull-brass_normal-dx.png", u_Normal);
-			WC_INFO(1e-4f);
+			gl::load("assets/test/albedo.png", u_Albedo);
+			gl::load("assets/test/pbr_output.png", u_MaterialInfo);
+			gl::load("assets/test/normal.png", u_Normal);
 		}
 		//----------------------------------------------------------------------------------------------------------------------
 		float angle = 0.f;
@@ -335,7 +321,7 @@ namespace wc {
 			angle += deltaTime * 6.f;
 			angle = glm::mod(angle, 360.f);
 			lighting[0].vector = -glm::vec3(glm::vec4(1.f, 0.f, 0.f, 0.f) * glm::rotate(glm::mat4(1.f), glm::radians(angle), glm::vec3(0.f, 0.f, 1.f)));
-			lighting[1].vector = camera.Position;
+			//lighting[1].vector = camera.Position;
 			lighting[1].color = convertColor(glm::vec4(0.f, 1.f, 1.f, intensity / 255.f));
 
 			lights.SetData(0, sizeof(lighting), lighting);
@@ -359,13 +345,13 @@ namespace wc {
 
 			float scale = 0.4f;
 
-			scrTexture.BindTextureImage(5, GL_READ_ONLY);
-			brightResultTexture.BindTextureImage(6);
-			compShader.use();
-			compShader.Dispatch(windsize.x, windsize.y, 1);
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+			//scrTexture.Bind(5);
+			//brightResultTexture.BindTextureImage(6);
+			//compShader.use();
+			//compShader.Dispatch(windsize.x, windsize.y, 1);
+			//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-			Renderer2D::DrawQuad({0,0}, windsize, brightResultTexture);
+			Renderer2D::DrawQuad({0,0}, windsize, scrTexture);
 			Renderer2D::DrawText("FPS: " + std::to_string((int)(1.f / deltaTime)) + " Frametime: " + std::to_string(deltaTime * 1000), font, { 25.f, 5.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("X: " + std::to_string(camera.Position.x) + " Y: " + std::to_string(camera.Position.y) + " Z: " + std::to_string(camera.Position.z), font, { 25.f, 15.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("Pitch: " + std::to_string(camera.Pitch) + " Yaw: " + std::to_string(camera.Yaw), font, { 25.f, 25.f * scale * 10.f }, scale);
