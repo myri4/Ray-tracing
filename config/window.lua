@@ -1,5 +1,5 @@
-screenWidth = 512
-screenHeight = 512
+screenWidth = 1024
+screenHeight = 1024
 framerateLimit = 0
 antialiasingLevel = 4
 vsync = false

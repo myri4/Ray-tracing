@@ -51,7 +51,6 @@ private:
 			{
 				Vertex vertex;
 				vertex.position = wc::AssimpGLMHelpers::GetGLMVec(mesh->mVertices[i]);
-				vertex.normal = wc::AssimpGLMHelpers::GetGLMVec(mesh->mNormals[i]);
 
 				if (mesh->mTextureCoords[0])
 				{

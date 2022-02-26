@@ -13,7 +13,6 @@
 struct Vertex {
     glm::vec2 texCoord = glm::vec2(0.f);
     alignas(16) glm::vec3 position = glm::vec3(0.f);
-    alignas(16) glm::vec3 normal = glm::vec3(0.f, 1.f, 0.f);
 };
 
 struct ind {

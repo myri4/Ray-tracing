@@ -14,7 +14,7 @@ namespace gl {
         inline virtual void Bind() const { glBindBuffer(target, m_RendererID); }
         static void Unbind() { glBindBuffer(target, 0); }
 
-        virtual void Create(const void* data, const GLsizeiptr& size, GLbitfield flags) {
+        virtual void Create(const void* data, const GLsizeiptr& size, GLbitfield flags = 0) {
            glCreateBuffers(1, &m_RendererID);
            glNamedBufferStorage(m_RendererID, size, data, flags);
         }

@@ -9,23 +9,17 @@ void main()
 #type fragment
 #version 450 core
 layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 BrightColor;
 
 struct Triangle{
-	vec3 a;
-	vec3 b;
-	vec3 c;    
-
 	vec2 texCoord1;
 	vec2 texCoord2;
 	vec2 texCoord3;
-
-	vec3 normal;
 };
 
 struct Vertex {
 	vec2 texCoord;
 	vec3 position;
-	vec3 normal;
 };
 
 struct Light {
@@ -69,7 +63,7 @@ layout(binding = 0) uniform sampler2D u_Albedo;
 layout(binding = 1) uniform sampler2D u_MaterialInfo;
 layout(binding = 2) uniform sampler2D u_Normal;
 
-bool Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in uint i, inout vec2 uv, inout float t) {
+vec3 Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in uint i) {
 	vec3 a = vertices[indices[i]].position;
 	vec3 b = vertices[indices[i + 1]].position;
 	vec3 c = vertices[indices[i + 2]].position;
@@ -79,13 +73,39 @@ bool Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in 
     float dotE1CrossRDE2 = 1.f / dot(e1, crossRDE2);
 	vec3 rOa = rayOrigin - a;
 	vec3 crossROAE1 = cross(rOa, e1);
+	vec2 uv;
 	uv.x = dot(rOa, crossRDE2) * dotE1CrossRDE2;
 	uv.y = dot(rayDirection, crossROAE1 * dotE1CrossRDE2);
 
-	t = dot(e2, crossROAE1) * dotE1CrossRDE2;
-		
-	return !(t <= 0.f || uv.x < 0.f || uv.x > 1.f || uv.y < 0.f || uv.x + uv.y > 1.f);	
+	float t = dot(e2, crossROAE1) * dotE1CrossRDE2;
+		if (!(t <= 0.f || uv.x < 0.f || uv.x > 1.f || uv.y < 0.f || uv.x + uv.y > 1.f))
+			return vec3(t, uv);
+		else 
+			return vec3(0.f, uv);	
 }
+
+/*vec3 Intersection( in vec3 rayOrigin, in vec3 rayDirection, const in uint i, inout vec3 n)
+{
+	vec3 a = vertices[indices[i]].position;
+
+    vec3 v1v0 = vertices[indices[i + 1]].position - a;
+    vec3 v2v0 = vertices[indices[i + 2]].position - a;
+    vec3 rov0 = rayOrigin - a;
+    // The four determinants above have lots of terms in common. Knowing the changing
+    // the order of the columns/rows doesn't change the volume/determinant, and that
+    // the volume is dot(cross(a,b,c)), we can precompute some common terms and reduce
+    // it all to:
+    n = normalize(cross( v1v0, v2v0 ));
+    vec3  q = cross( rov0, rayDirection );
+    float d = 1.f / dot( rayDirection, n );
+    float u = d*dot( -q, v2v0 );
+    float v = d*dot(  q, v1v0 );
+    float t = d*dot( -n, rov0 );
+
+    if( u < 0.f || v < 0.f || (u + v) > 1.f ) t = -1.f;
+    
+    return vec3( t, u, v );
+}*/
 
 const float Epsilon = 1.192092896e-07F;
 const float bias = 1e-4;
@@ -217,13 +237,12 @@ float Hm = 1200.f;               // Same as above but for Mie scattering (Hm)
 vec3 betaR = vec3(3.8e-6f, 13.5e-6f, 33.1e-6f); 
 vec3 betaM = vec3(21e-6f); 
 const float kInfinity = 3.402823466e+38F;
+const float gamma = 2.2f;
 
 vec3 position = vec3(0.f);
 bool raySphereIntersect(const in vec3 rayOrigin, const in vec3 rayDirection, const in float radius, inout float t0, inout float t1) {
 	vec3 L = position - rayOrigin;
 	float tca = dot(L, rayDirection);
-
-	//if (tca < 0) return false;
 
 	float s2 = (dot(L, L)) - (tca * tca);
 
@@ -297,31 +316,26 @@ vec3 computeIncidentLight(const in vec3 orig, const in vec3 dir, out float mixer
 
 vec3 ambientColor = vec3(0.03f);
 
-vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 ref) {
+vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec4 ref) {
 	vec3 color = vec3(0.f);
 	float minT = kInfinity;
 	uint shapeHit = 0;
 	vec2 uv;
 	bool triangleFound = false;
-	float t = 0.f;
 	Triangle triangle;
-	Triangle testTriangle;
 
 	for (uint i = 0; i < numIndices; i += 3) {
-		vec2 uv2;
-		
-		testTriangle.texCoord3 = vertices[indices[i]].texCoord;
-		testTriangle.texCoord1 = vertices[indices[i + 1]].texCoord;
-		testTriangle.texCoord2 = vertices[indices[i + 2]].texCoord;
+		vec3 intInfo = Intersection(refRayOrigin, refRayDirection, i);
 
-		testTriangle.normal = vertices[indices[i]].normal;
-
-		if (Intersection(refRayOrigin, refRayDirection, i, uv2, t) && t < minT) {			
-			minT = t;
-			uv = uv2;
+		if (intInfo.x > 0.f && intInfo.x < minT) {			
+			minT = intInfo.x;
+			uv = intInfo.yz;
 			shapeHit = i;
 			triangleFound = true;
-			triangle = testTriangle;
+
+			triangle.texCoord3 = vertices[indices[i]].texCoord;
+			triangle.texCoord1 = vertices[indices[i + 1]].texCoord;
+			triangle.texCoord2 = vertices[indices[i + 2]].texCoord;
 		}
 	}
 
@@ -332,12 +346,17 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 re
 		vec2 texCoords = rtLerp(uvw, triangle.texCoord1, triangle.texCoord2, triangle.texCoord3);
 
 		vec4 materialInfo = texture(u_MaterialInfo, texCoords);
-		vec3 albedo = texture(u_Albedo, texCoords).rgb;
+		vec3 albedo = texture(u_Albedo, texCoords).rgb;//pow(texture(u_Albedo, texCoords).rgb, vec3(gamma));
 		float ao = materialInfo.r;
 		float roughness = materialInfo.g;
 		float metallic = materialInfo.b;
-		
-		vec3 N = getNormalFromMap(triangle.normal, p0, texCoords);
+
+		// Get the normal vector
+		vec3 aPos = vertices[indices[shapeHit]].position;
+
+    	vec3 v1v0 = vertices[indices[shapeHit + 1]].position - aPos;
+    	vec3 v2v0 = vertices[indices[shapeHit + 2]].position - aPos;
+		vec3 N = getNormalFromMap(cross( v1v0, v2v0 ), p0, texCoords);
 
 		if (dot(refRayDirection, N) > 0.f) N = -N;
 
@@ -371,13 +390,11 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 re
 			vec3 H = normalize(L - refRayDirection);
 			
 			bool LightHit = false;
-			float t0 = 0.f;
 			for (uint i = 0; i < numIndices; i += 3) {
-				vec2 uv2;
-			
-				if (Intersection(p0 + 0.000001 * N, L, i, uv2, t0)){
+				vec3 intInfo = Intersection(p0 + 0.000001 * N, L, i);
+				if (intInfo.x > 0.f){
 					LightHit = true;
-					minT = t0;
+					minT = intInfo.x;
 				} 
 			}
 
@@ -404,10 +421,10 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 re
 		vec3 ambient = ambientColor * ao * albedo;
 
 		color = ambient + Lo;
-		ref = albedo * fresnelSchlickRoughness(NdotV, F0, roughness);
-		refRayOrigin = p0 + 0.000001 * N;
+		ref = vec4(albedo, fresnelSchlickRoughness(NdotV, F0, roughness));
+		refRayOrigin = p0 + 0.000003 * N;
 		refRayDirection = reflect(refRayDirection, N);
-		//color = vec3(5.f, 0.f, 0.f);
+		//color = vec3(0.f, 2.f, 2.f);
 	}
 	else{
 		vec3 color1 = clamp(getStars(refRayOrigin, refRayDirection, 1, 0.5) * 1.5, 0.0, 1.0) * vec3(0.0, 0.0, 1.0);
@@ -427,14 +444,14 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec3 re
 vec3 Render(const in vec3 rayDirection){
 	vec3 refRayOrigin = cameraPos;
 	vec3 refRayDirection = rayDirection;
-	float blendFactor = 0.f;
-	vec3 color, ref, fil = vec3(1.f);//
+	vec3 color = vec3(0.f), fil = vec3(1.f);//
+	vec4 ref = vec4(0.f);
 
 	for (uint i = 0; i < maxBounces; i++){
 		vec3 pass = rayTrace(refRayOrigin, refRayDirection, ref); 
 		color += pass * fil;
 
-		fil *= ref;
+		fil *= ref.rgb * ref.a;
 	}
 
 	return color;
@@ -447,9 +464,16 @@ void main()
 	vec3 result = Render(rayDir);
 	
 	// HDR tonemapping
-	result = result / (result + 1.f);
+	//result = result / (result + 1.f);
 	// gamma correct
-	result = pow(result, vec3(1.f / 2.2f));  
+	//result = pow(result, vec3(1.f / gamma));  
+
+	// Extract the bloomy parts
+	float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
+    if(brightness > 0.5)
+        BrightColor = vec4(result, 1.0);
+    else
+        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
 
     FragColor = vec4(result, 1.f);
 }

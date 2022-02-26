@@ -319,7 +319,15 @@ namespace gl {
 		void Dispatch(const GLuint& num_groups_x, const GLuint& num_groups_y, const GLuint& num_groups_z) {
 			glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
 		}
-	private:
+
+		void Dispatch(const glm::vec3& num_groups) {
+			glDispatchCompute(num_groups.x, num_groups.y, num_groups.z);
+		}
+		
+		void Dispatch(const glm::vec2& num_groups) {
+			glDispatchCompute(num_groups.x, num_groups.y, 1);
+		}
 		uint32_t m_RendererID = 0;
+	private:
 	};
 }
