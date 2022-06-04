@@ -14,7 +14,6 @@ namespace wc {
 class Model{
 public:
 	// model data 
-	Mesh modelMesh;
 	std::string directory;
 
 	// constructor, expects a filepath to a 3D model.
@@ -45,7 +44,7 @@ private:
 		for (uint32_t j = 0; j < node->mNumMeshes; j++) {
 			auto& mesh = scene.mMeshes[node->mMeshes[j]];
 			std::vector<Vertex> vertices;
-			std::vector<ind> indices;
+			std::vector<uint32_t> indices;
 			vertices.reserve(mesh->mNumVertices);
 			for (uint32_t i = 0; i < mesh->mNumVertices; i++)
 			{
@@ -66,12 +65,10 @@ private:
 			for (uint32_t i = 0; i < mesh->mNumFaces; i++)
 			{
 				aiFace& face = mesh->mFaces[i];
-				for (uint32_t j = 0; j < face.mNumIndices; j++) {
-					indices.emplace_back((ind)face.mIndices[j]);
-					//WC_INFO(face.mIndices[j]);
-				}
+				for (uint32_t j = 0; j < face.mNumIndices; j++) 
+					indices.emplace_back(face.mIndices[j]);				
 			}
-			modelMesh.Create(vertices, indices);
+			//modelMesh.Create(vertices, indices);
 		}	
 		
 		// after we've processed all of the meshes (if any) we then recursively process each of the children nodes

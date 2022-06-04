@@ -15,9 +15,6 @@ namespace wc {
 	static const uint32_t MaxQuadVertexCount = MaxQuadCount * 4;
 	static const uint32_t MaxQuadIndexCount = MaxQuadCount * 6;
 
-	static const uint32_t MaxLineCount = 100;
-	static const uint32_t MaxLineVertexCount = MaxLineCount * 2;
-
 	static const uint8_t MaxTextures = 32;
 
 	struct Vertex2D {
@@ -106,11 +103,6 @@ namespace wc {
 			gl::VertexArray m_VAO;
 			gl::IndexBuffer m_EBO;
 
-			gl::VertexBuffer m_LineVBO;
-			gl::VertexArray m_LineVAO;
-			uint32_t lineByteOffset = 0;
-			uint32_t LineIndexCount = 0;
-
 			gl::Shader m_Shader;
 		} m_Data;
 
@@ -141,14 +133,7 @@ namespace wc {
 			m_Data.m_VAO.AddVertexBuffer(m_Data.m_VBO, sizeof(Vertex2D));
 			m_Data.m_VAO.AddIndexBuffer(m_Data.m_EBO);
 
-			m_Data.m_LineVAO.Create();
-			m_Data.m_LineVBO.Create(nullptr, MaxLineVertexCount * sizeof(Vertex2D), GL_DYNAMIC_STORAGE_BIT);
-			m_Data.m_LineVAO.VertexAttribPointer(0, 2, offsetof(Vertex2D, Position));
-			m_Data.m_LineVAO.VertexAttribPointer(1, 3, offsetof(Vertex2D, TexCoords));
-			m_Data.m_LineVAO.VertexAttribPointer(2, 1, offsetof(Vertex2D, Color));
-			m_Data.m_LineVAO.VertexAttribPointer(3, 1, offsetof(Vertex2D, Type));
-			m_Data.m_LineVAO.AddVertexBuffer(m_Data.m_LineVBO, sizeof(Vertex2D));
-			m_Data.m_Shader.Create("shaderpacks/default/Renderer2D.glsl");
+			m_Data.m_Shader.Create("shaders/Renderer2D.vert", "shaders/Renderer2D.frag");
 
 			float color[] = { 1.f, 1.f, 1.f };
 			m_Data.whiteTexture.Create(color, 1, 1);
@@ -161,16 +146,6 @@ namespace wc {
 			m_Data.m_Shader.setMat4(0, proj);
 		}
 
-		void FlushLines() {
-			if (!m_Data.LineIndexCount) return;
-			m_Data.m_Shader.use();
-
-			m_Data.m_LineVAO.Bind();
-			Renderer::DrawArrays(m_Data.LineIndexCount, 0, GL_LINES);
-			m_Data.LineIndexCount = 0;
-			m_Data.lineByteOffset = 0;
-		}
-
 		void Flush() {
 			if (!m_Data.IndexCount) return;
 			m_Data.m_Shader.use();
@@ -179,13 +154,10 @@ namespace wc {
 				glBindTextureUnit(i, m_Data.TextureSlots[i]);
 			
 			m_Data.m_VAO.Bind();
-			m_Data.m_EBO.Bind();
 			Renderer::DrawIndexed(m_Data.IndexCount);
 			m_Data.IndexCount = 0;
 			m_Data.byteOffset = 0;
 			m_Data.TextureSlotIndex = 1;
-			m_Data.m_EBO.Unbind();
-			FlushLines();
 		}
 
 		void DrawQuad(const glm::vec2& pos, const glm::vec2& size, const glm::vec4& color = glm::vec4(1.f)) {
@@ -315,32 +287,6 @@ namespace wc {
 				// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
 				pos.x += (ch.Advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
 			}
-		}
-
-		void DrawLine(const glm::vec2& start, const glm::vec2& end, const glm::vec4& color = glm::vec4(1.f)) {
-			if (m_Data.LineIndexCount >= MaxLineVertexCount) FlushLines();
-
-			uint32_t Color = (uint32_t)(color.r * 255.f) << 24 | (uint32_t)(color.g * 255.f) << 16 | (uint32_t)(color.b * 255.f) << 8 | (uint32_t)(color.a * 255.f);
-			Vertex2D vertices[2];
-			vertices[0] = Vertex2D(start, glm::vec3(0.f), Color, 2.f);
-			vertices[1] = Vertex2D(end, glm::vec3(0.f), Color, 2.f);
-
-			m_Data.m_LineVBO.SetData(m_Data.lineByteOffset, sizeof(vertices), vertices);
-			m_Data.lineByteOffset += sizeof(vertices);
-			m_Data.LineIndexCount += 2;
-		}
-
-		void DrawLineDC(const glm::vec2& start, const glm::vec3& end, const glm::vec4& startColor = glm::vec4(1.f), const glm::vec4& endColor = glm::vec4(1.f)) {
-			if (m_Data.LineIndexCount >= MaxLineVertexCount) FlushLines();
-
-			uint32_t ColorStart, colorEnd;
-			Vertex2D vertices[2];
-			vertices[0] = Vertex2D(start, glm::vec3(0.f), ColorStart, 2.f);
-			vertices[1] = Vertex2D(end, glm::vec3(0.f), colorEnd, 2.f);
-
-			m_Data.m_LineVBO.SetData(m_Data.lineByteOffset, sizeof(vertices), vertices);
-			m_Data.lineByteOffset += sizeof(vertices);
-			m_Data.LineIndexCount += 2;
 		}
 
 		glm::mat4 Get2DProj(const glm::vec2& windowSize) { return glm::ortho(0.f, windowSize.x, windowSize.y, 0.f); }

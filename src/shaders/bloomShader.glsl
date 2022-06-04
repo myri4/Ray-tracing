@@ -1,7 +1,7 @@
-// Thx to The Cherno for the shader code
-#version 450 core
+#type compute
+#version 450
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 4, local_size_y = 4) in;
 layout(binding = 0, rgba32f) restrict writeonly uniform image2D o_Image;
 
 const float Epsilon = 1.0e-4;

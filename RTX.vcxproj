@@ -172,7 +172,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="common\gl\CubeMap.hpp" />
     <ClCompile Include="common\Maths\AssimpGLMHelpers.hpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
@@ -183,7 +182,6 @@
     <ClInclude Include="common\gl\VertexArray.hpp" />
     <ClInclude Include="common\GUI\AssetManager.hpp" />
     <ClInclude Include="common\GUI\Button.hpp" />
-    <ClInclude Include="common\GUI\ParticleSystem.hpp" />
     <ClInclude Include="common\GUI\Renderer2D.hpp" />
     <ClInclude Include="common\GUI\Textbox.hpp" />
     <ClInclude Include="common\Maths\Camera.hpp" />
@@ -221,7 +219,6 @@
     <ClInclude Include="common\Utils\Time.hpp" />
     <ClInclude Include="common\Utils\Window.hpp" />
     <ClInclude Include="common\wc\pch.hpp" />
-    <ClInclude Include="common\wc\Skybox.hpp" />
     <ClInclude Include="gl\Camera.h" />
     <ClInclude Include="gl\Cubemap.h" />
     <ClInclude Include="gl\FrameBuffer.h" />

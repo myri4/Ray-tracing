@@ -8,27 +8,18 @@ namespace gl {
     class Buffer {
     public:
         Buffer() = default;
-        Buffer(const void* data, const GLsizeiptr& size, const GLenum& flags) { Create(data, size, flags); }
-        //~Buffer() { Destroy(); }
 
-        inline virtual void Bind() const { glBindBuffer(target, m_RendererID); }
-        static void Unbind() { glBindBuffer(target, 0); }
+        inline void Bind() const { glBindBuffer(target, m_RendererID); }
 
-        virtual void Create(const void* data, const GLsizeiptr& size, GLbitfield flags = 0) {
+        void Create(const void* data, const GLsizeiptr& size, GLbitfield flags = 0) {
            glCreateBuffers(1, &m_RendererID);
            glNamedBufferStorage(m_RendererID, size, data, flags);
         }
 
-        inline virtual void Destroy() { glDeleteBuffers(1, &m_RendererID); }
+        inline void Destroy() { glDeleteBuffers(1, &m_RendererID); }
 
-        virtual void SetData(const GLintptr& offset, const GLsizeiptr& size, const void* data) {
+        void SetData(const GLintptr& offset, const GLsizeiptr& size, const void* data) {
            glNamedBufferSubData(m_RendererID, offset, size, data);
-        }
-
-        virtual void* GetData(const GLintptr& offset, const GLsizeiptr& size) {
-            void* data = nullptr;
-            glGetNamedBufferSubData(m_RendererID, offset, size, data);
-            return data;
         }
 
         void* Map(const GLenum& access) {
@@ -56,6 +47,7 @@ namespace gl {
 
     class ShaderStorageBuffer : public Buffer<GL_SHADER_STORAGE_BUFFER> {
     public:
+        void BufferRange(const GLuint& index, const GLintptr& offset, const GLsizeiptr& size) { glBindBufferRange(GL_SHADER_STORAGE_BUFFER, index, m_RendererID, offset, size); }
         void BufferBase(const GLuint& index) { glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, m_RendererID); }
     };
 }

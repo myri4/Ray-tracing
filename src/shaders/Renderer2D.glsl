@@ -1,5 +1,5 @@
 #type vertex
-#version 430 core
+#version 450 core
 
 layout(location = 0) in vec2 a_Pos;
 layout(location = 1) in vec3 a_TexCoords;
@@ -8,9 +8,9 @@ layout(location = 3) in float a_Type;
 
 layout(location = 0) uniform mat4 u_Projection = mat4(1.f);
 
-out vec3 v_TexCoords;
-out vec4 v_Color;
-out float v_Type;
+layout(location = 0) out vec3 v_TexCoords;
+layout(location = 1) out vec4 v_Color;
+layout(location = 2) out float v_Type;
 
 void main() {
     v_TexCoords = a_TexCoords;
@@ -26,11 +26,11 @@ void main() {
 }
 
 #type fragment
-#version 430 core
+#version 450 core
 
-in vec3 v_TexCoords;
-in vec4 v_Color;
-in float v_Type;
+layout(location = 0) in vec3 v_TexCoords;
+layout(location = 1) in vec4 v_Color;
+layout(location = 2) in float v_Type;
 
 layout(binding = 0) uniform sampler2D u_Texture[32];
 

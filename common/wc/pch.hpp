@@ -30,7 +30,6 @@
 #include <gl/Texture.hpp>
 #include <gl/VertexArray.hpp>
 #include <gl/FrameBuffer.hpp>
-#include "Skybox.hpp"
 
 #include <Maths/Camera.hpp>
 

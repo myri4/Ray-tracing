@@ -1,21 +1,8 @@
-#type vertex
-#version 450 core
-layout (location = 0) in vec2 a_Pos;
+#type compute
+#version 450
 
-void main()
-{
-    gl_Position = vec4(a_Pos, 0.0, 1.0); 
-}  
-#type fragment
-#version 450 core
-layout(location = 0) out vec4 FragColor;
-layout(location = 1) out vec4 BrightColor;
-
-struct Triangle{
-	vec2 texCoord1;
-	vec2 texCoord2;
-	vec2 texCoord3;
-};
+layout(local_size_x = 4, local_size_y = 4) in;
+layout(binding = 0, rgba32f) restrict writeonly uniform image2D o_Image;
 
 struct Vertex {
 	vec2 texCoord;
@@ -23,8 +10,8 @@ struct Vertex {
 };
 
 struct Light {
-	uint color;
 	vec3 vector;
+	uint color;
 };
 
 float rtLerp(const in vec3 uvw, const in float a, const in float b, const in float c) { return uvw.x * a + uvw.y * b + uvw.z * c; }
@@ -34,34 +21,21 @@ vec4 rtLerp(const in vec3 uvw, const in vec4 a, const in vec4 b, const in vec4 c
 
 layout (std140, binding = 0) uniform SceneData
 {
-    vec2 windowSize;
 	vec3 lower_left_corner;
 	vec3 horizontal;
 	vec3 vertical;
 	vec3 cameraPos;
-    uint numIndices;
+    uint IndexCount;
     uint numLights;
 	uint maxBounces;
 };
 
-layout (std140, binding = 1) uniform Lighting
-{
-    Light lights[1];
-};
+layout (std140, binding = 1) uniform Lighting { Light lights[1]; };
+layout (std430, binding = 2) readonly buffer VertexData { Vertex vertices[1]; };
+layout (std430, binding = 3) readonly buffer IndexData { uint indices[1]; };
 
-layout (std140, binding = 2) uniform VertexData
-{
-    Vertex vertices[1];
-};
-
-layout (std140, binding = 3) uniform IndexData
-{
-    uint indices[1];
-};
-
-layout(binding = 0) uniform sampler2D u_Albedo;
-layout(binding = 1) uniform sampler2D u_MaterialInfo;
-layout(binding = 2) uniform sampler2D u_Normal;
+layout(binding = 1) uniform sampler2D u_Albedo;
+layout(binding = 2) uniform sampler2D u_MaterialInfo;
 
 vec3 Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in uint i) {
 	vec3 a = vertices[indices[i]].position;
@@ -84,49 +58,87 @@ vec3 Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in 
 			return vec3(0.f, uv);	
 }
 
-/*vec3 Intersection( in vec3 rayOrigin, in vec3 rayDirection, const in uint i, inout vec3 n)
+#define MAX_STEPS 100
+#define SURF_DIST .01
+
+const float kInfinity = 3.402823466e+38F;
+const float MAX_DIST = 3.402823466e+38F;
+
+float dot2( in vec3 v ) { return dot(v,v); }
+
+float udTriangle( in vec3 v1, in vec3 v2, in vec3 v3, in vec3 p )
 {
-	vec3 a = vertices[indices[i]].position;
+    vec3 v21 = v2 - v1; vec3 p1 = p - v1;
+    vec3 v32 = v3 - v2; vec3 p2 = p - v2;
+    vec3 v13 = v1 - v3; vec3 p3 = p - v3;
+    vec3 nor = cross( v21, v13 );
 
-    vec3 v1v0 = vertices[indices[i + 1]].position - a;
-    vec3 v2v0 = vertices[indices[i + 2]].position - a;
-    vec3 rov0 = rayOrigin - a;
-    // The four determinants above have lots of terms in common. Knowing the changing
-    // the order of the columns/rows doesn't change the volume/determinant, and that
-    // the volume is dot(cross(a,b,c)), we can precompute some common terms and reduce
-    // it all to:
-    n = normalize(cross( v1v0, v2v0 ));
-    vec3  q = cross( rov0, rayDirection );
-    float d = 1.f / dot( rayDirection, n );
-    float u = d*dot( -q, v2v0 );
-    float v = d*dot(  q, v1v0 );
-    float t = d*dot( -n, rov0 );
+    return sqrt( (sign(dot(cross(v21,nor),p1)) + 
+                  sign(dot(cross(v32,nor),p2)) + 
+                  sign(dot(cross(v13,nor),p3))<2.0) 
+                  ?
+                  min( min( 
+                  dot2(v21*clamp(dot(v21,p1)/dot2(v21),0.0,1.0)-p1), 
+                  dot2(v32*clamp(dot(v32,p2)/dot2(v32),0.0,1.0)-p2) ), 
+                  dot2(v13*clamp(dot(v13,p3)/dot2(v13),0.0,1.0)-p3) )
+                  :
+                  dot(nor,p1)*dot(nor,p1)/dot2(nor) );
+}
 
-    if( u < 0.f || v < 0.f || (u + v) > 1.f ) t = -1.f;
+float GetDist(vec3 p) {    
+
+    float minT = kInfinity;
+
+	for (uint i = 0; i < IndexCount; i += 3) 
+		minT = min(minT, udTriangle(vertices[indices[i]].position, vertices[indices[i + 1]].position, vertices[indices[i + 2]].position, p));	
     
-    return vec3( t, u, v );
-}*/
+    return minT;
+}
 
-const float Epsilon = 1.192092896e-07F;
+float GetDistAndData(vec3 p, out uint id) {    
+
+    float minT = kInfinity;
+
+	for (uint i = 0; i < IndexCount; i += 3) {
+        float d = udTriangle(vertices[indices[i]].position, vertices[indices[i + 1]].position, vertices[indices[i + 2]].position, p);
+        if (d < minT){
+		    minT = d;
+            id = i;
+        }
+    }
+    
+    return minT;
+}
+
+float RayMarch(vec3 ro, vec3 rd, out uint id) {
+	float dO = 0.f;
+    
+    for(int i=0; i<MAX_STEPS; i++) {
+    	vec3 p = ro + rd*dO;
+        float dS = GetDistAndData(p, id);
+        dO += dS;
+        if(dO>MAX_DIST || dS<SURF_DIST) break;
+    }
+    
+    return dO;
+}
+
+vec3 GetNormal(vec3 p) {
+	float d = GetDist(p);
+    vec2 e = vec2(.01, 0);
+    
+    vec3 n = d - vec3(
+        GetDist(p-e.xyy),
+        GetDist(p-e.yxy),
+        GetDist(p-e.yyx));
+    
+    return normalize(n);
+}
+
+const float Epsilon = 1.0e-4;
 const float bias = 1e-4;
 
 const float PI = 3.14159265358979323846264338327950288f;
-
-vec3 getNormalFromMap(const in vec3 N, const in vec3 p0, const in vec2 TexCoords)
-{
-    vec3 tangentNormal = texture(u_Normal, TexCoords).rgb * 2.f - 1.f;
-
-    vec3 Q1  = dFdx(p0);
-    vec3 Q2  = dFdy(p0);
-    vec2 st1 = dFdx(TexCoords);
-    vec2 st2 = dFdy(TexCoords);
-
-    vec3 T   = normalize(Q1 * st2.t - Q2 * st1.t);
-    vec3 B   = -normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return -normalize(TBN * tangentNormal);
-}
 
 float DistributionGGX(const in vec3 N, const in vec3 H, const in float roughness)
 {
@@ -164,9 +176,237 @@ vec3 fresnelSchlickRoughness(const in float cosTheta, const in vec3 F0, const in
 }
 
 /*sky start*/
-float hash( const in float n ) {
-	return fract(sin(n)*4378.5453);
+float hash( const in float n ) { return fract(sin(n)*4378.5453); }
+
+float hash1( vec2 p )
+{
+    p  = 50.0*fract( p*0.3183099 );
+    return fract( p.x*p.y*(p.x+p.y) );
 }
+
+float hash1( float n )
+{
+    return fract( n*17.0*fract( n*0.3183099 ) );
+}
+
+const mat3 m3  = mat3( 0.00,  0.80,  0.60,
+                      -0.80,  0.36, -0.48,
+                      -0.60, -0.48,  0.64 );
+
+vec4 noised( in vec3 x )
+{
+    vec3 p = floor(x);
+    vec3 w = fract(x);
+    #if 1
+    vec3 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+    vec3 du = 30.0*w*w*(w*(w-2.0)+1.0);
+    #else
+    vec3 u = w*w*(3.0-2.0*w);
+    vec3 du = 6.0*w*(1.0-w);
+    #endif
+
+    float n = p.x + 317.0*p.y + 157.0*p.z;
+    
+    float a = hash1(n+0.0);
+    float b = hash1(n+1.0);
+    float c = hash1(n+317.0);
+    float d = hash1(n+318.0);
+    float e = hash1(n+157.0);
+	float f = hash1(n+158.0);
+    float g = hash1(n+474.0);
+    float h = hash1(n+475.0);
+
+    float k0 =   a;
+    float k1 =   b - a;
+    float k2 =   c - a;
+    float k3 =   e - a;
+    float k4 =   a - b - c + d;
+    float k5 =   a - c - e + g;
+    float k6 =   a - b - e + f;
+    float k7 = - a + b + c - d + e - f - g + h;
+
+    return vec4( -1.0+2.0*(k0 + k1*u.x + k2*u.y + k3*u.z + k4*u.x*u.y + k5*u.y*u.z + k6*u.z*u.x + k7*u.x*u.y*u.z), 
+                      2.0* du * vec3( k1 + k4*u.y + k6*u.z + k7*u.y*u.z,
+                                      k2 + k5*u.z + k4*u.x + k7*u.z*u.x,
+                                      k3 + k6*u.x + k5*u.y + k7*u.x*u.y ) );
+}
+
+float noise( in vec3 x )
+{
+    vec3 p = floor(x);
+    vec3 w = fract(x);
+    
+    vec3 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+
+    float n = p.x + 317.0*p.y + 157.0*p.z;
+    
+    float a = hash1(n+0.0);
+    float b = hash1(n+1.0);
+    float c = hash1(n+317.0);
+    float d = hash1(n+318.0);
+    float e = hash1(n+157.0);
+	float f = hash1(n+158.0);
+    float g = hash1(n+474.0);
+    float h = hash1(n+475.0);
+
+    float k0 =   a;
+    float k1 =   b - a;
+    float k2 =   c - a;
+    float k3 =   e - a;
+    float k4 =   a - b - c + d;
+    float k5 =   a - c - e + g;
+    float k6 =   a - b - e + f;
+    float k7 = - a + b + c - d + e - f - g + h;
+
+    return -1.0+2.0*(k0 + k1*u.x + k2*u.y + k3*u.z + k4*u.x*u.y + k5*u.y*u.z + k6*u.z*u.x + k7*u.x*u.y*u.z);
+}
+
+vec3 noised( in vec2 x )
+{
+    vec2 p = floor(x);
+    vec2 w = fract(x);
+    #if 1
+    vec2 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+    vec2 du = 30.0*w*w*(w*(w-2.0)+1.0);
+    #else
+    vec2 u = w*w*(3.0-2.0*w);
+    vec2 du = 6.0*w*(1.0-w);
+    #endif
+    
+    float a = hash1(p+vec2(0,0));
+    float b = hash1(p+vec2(1,0));
+    float c = hash1(p+vec2(0,1));
+    float d = hash1(p+vec2(1,1));
+
+    float k0 = a;
+    float k1 = b - a;
+    float k2 = c - a;
+    float k4 = a - b - c + d;
+
+    return vec3( -1.0+2.0*(k0 + k1*u.x + k2*u.y + k4*u.x*u.y), 
+                 2.0*du * vec2( k1 + k4*u.y,
+                            k2 + k4*u.x ) );
+}
+
+vec4 fbmd_8( in vec3 x )
+{
+    float f = 2.0;
+    float s = 0.65;
+    float a = 0.0;
+    float b = 0.5;
+    vec3  d = vec3(0.0);
+    mat3  m = mat3(1.0,0.0,0.0,
+                   0.0,1.0,0.0,
+                   0.0,0.0,1.0);
+    for( int i=0; i<8; i++ )
+    {
+        vec4 n = noised(x);
+        a += b*n.x;          // accumulate values		
+        if( i<4 )
+        d += b*m*n.yzw;      // accumulate derivatives
+        b *= s;
+        x = f*m3*x;
+        m = f*m3*m;
+    }
+	return vec4( a, d );
+}
+
+vec4 cloudsFbm( in vec3 pos , in float iTime)
+{
+    return fbmd_8(pos*0.0015+vec3(2.0,1.1,1.0)+0.07*vec3(iTime,0.5*iTime,-0.15*iTime));
+}
+
+vec4 cloudsMap( in vec3 pos, out float nnd )
+{
+    float d = abs(pos.y-900.0)-40.0;
+    vec3 gra = vec3(0.0,sign(pos.y-900.0),0.0);
+    
+    vec4 n = cloudsFbm(pos, 0.f);
+    d += 400.0*n.x * (0.7+0.3*gra.y);
+    
+    if( d>0.0 ) return vec4(-d,0.0,0.0,0.0);
+    
+	d = -d;
+    nnd = d;
+    d = min(d/100.0,0.25);
+    
+    //gra += 0.1*n.yzw *  (0.7+0.3*gra.y);
+    
+    return vec4( d, gra );
+}
+
+vec4 renderClouds( in vec3 ro, in vec3 rd, float tmin, float tmax, inout float resT, in vec2 px )
+{
+    vec4 sum = vec4(0.0);
+
+    // bounding volume!!
+    float tl = ( 600.0-ro.y)/rd.y;
+    float th = (1200.0-ro.y)/rd.y;
+    if( tl>0.0 ) tmin = max( tmin, tl ); else return sum;
+    if( th>0.0 ) tmax = min( tmax, th );
+
+    float t = tmin;
+    float lastT = -1.0;
+    float thickness = 0.0;
+    for(int i=0; i<128; i++)
+    { 
+        vec3  pos = ro + t*rd; 
+        float nnd;
+        vec4  denGra = cloudsMap( pos, nnd ); 
+        float den = denGra.x;
+        float dt = max(0.2,0.011*t);
+        //dt *= hash1(px+float(i));
+        if( den>0.001 ) 
+        { 
+            float kk;
+            cloudsMap( pos+lights[0].vector*70.0, kk );
+            float sha = 1.0-smoothstep(-200.0,200.0,kk); sha *= 1.5;
+            
+            vec3 nor = normalize(denGra.yzw);
+            float dif = clamp( 0.4+0.6*dot(nor,lights[0].vector), 0.0, 1.0 )*sha; 
+            float fre = clamp( 1.0+dot(nor,rd), 0.0, 1.0 )*sha;
+            float occ = 0.2+0.7*max(1.0-kk/200.0,0.0) + 0.1*(1.0-den);
+            // lighting
+            vec3 lin  = vec3(0.0);
+                 lin += vec3(0.70,0.80,1.00)*1.0*(0.5+0.5*nor.y)*occ;
+                 lin += vec3(0.10,0.40,0.20)*1.0*(0.5-0.5*nor.y)*occ;
+                 lin += vec3(1.00,0.95,0.85)*3.0*dif*occ + 0.1;
+
+            // color
+            vec3 col = vec3(0.8,0.8,0.8)*0.45;
+
+            col *= lin;
+
+            //col = fog( col, t );
+
+            // front to back blending    
+            float alp = clamp(den*0.5*0.125*dt,0.0,1.0);
+            col.rgb *= alp;
+            sum = sum + vec4(col,alp)*(1.0-sum.a);
+
+            thickness += dt*den;
+            if( lastT<0.0 ) lastT = t;            
+        }
+        else 
+        {
+            dt = abs(den)+0.2;
+
+        }
+        t += dt;
+        if( sum.a>0.995 || t>tmax ) break;
+    }
+    
+    //resT = min(resT, (150.0-ro.y)/rd.y );
+    if( lastT>0.0 ) resT = min(resT,lastT);
+    //if( lastT>0.0 ) resT = mix( resT, lastT, sum.w );
+    
+    
+    sum.xyz += max(0.0,1.0-0.0125*thickness)*vec3(1.00,0.60,0.40)*0.3*pow(clamp(dot(lights[0].vector,rd),0.0,1.0),32.0);
+
+    return clamp( sum, 0.0, 1.0 );
+}
+
+
 
 float pnoise(in vec3 o) 
 {
@@ -236,7 +476,6 @@ float Hr = 7994.f;               // Thickness of the atmosphere if density was u
 float Hm = 1200.f;               // Same as above but for Mie scattering (Hm)
 vec3 betaR = vec3(3.8e-6f, 13.5e-6f, 33.1e-6f); 
 vec3 betaM = vec3(21e-6f); 
-const float kInfinity = 3.402823466e+38F;
 const float gamma = 2.2f;
 
 vec3 position = vec3(0.f);
@@ -318,45 +557,42 @@ vec3 ambientColor = vec3(0.03f);
 
 vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec4 ref) {
 	vec3 color = vec3(0.f);
-	float minT = kInfinity;
 	uint shapeHit = 0;
 	vec2 uv;
-	bool triangleFound = false;
-	Triangle triangle;
+	float t = RayMarch(refRayOrigin, refRayDirection, shapeHit);
+	//vec2 texCoord[3];
 
-	for (uint i = 0; i < numIndices; i += 3) {
-		vec3 intInfo = Intersection(refRayOrigin, refRayDirection, i);
+	//for (uint i = 0; i < IndexCount; i += 3) {
+	//	vec3 intInfo = Intersection(refRayOrigin, refRayDirection, i);
+//
+	//	if (intInfo.x > 0.f && intInfo.x < minT) {			
+	//		minT = intInfo.x;
+	//		uv = intInfo.yz;
+	//		shapeHit = i;
+	//		triangleFound = true;
+//
+	//		//texCoord[2] = vertices[indices[i]].texCoord;
+	//		//texCoord[0] = vertices[indices[i + 1]].texCoord;
+	//		//texCoord[1] = vertices[indices[i + 2]].texCoord;
+	//	}
+	//}
 
-		if (intInfo.x > 0.f && intInfo.x < minT) {			
-			minT = intInfo.x;
-			uv = intInfo.yz;
-			shapeHit = i;
-			triangleFound = true;
+    
 
-			triangle.texCoord3 = vertices[indices[i]].texCoord;
-			triangle.texCoord1 = vertices[indices[i + 1]].texCoord;
-			triangle.texCoord2 = vertices[indices[i + 2]].texCoord;
-		}
-	}
+	if (t < kInfinity) {
+		vec3 p0 = refRayOrigin + t * refRayDirection;
 
-	if (triangleFound) {
-		vec3 p0 = refRayOrigin + minT * refRayDirection;
+		//vec3 uvw = vec3(uv, 1.f - uv.x - uv.y);
+		//vec2 texCoords = rtLerp(uvw, texCoord[0], texCoord[1], texCoord[2]);
 
-		vec3 uvw = vec3(uv, 1.f - uv.x - uv.y);
-		vec2 texCoords = rtLerp(uvw, triangle.texCoord1, triangle.texCoord2, triangle.texCoord3);
-
-		vec4 materialInfo = texture(u_MaterialInfo, texCoords);
-		vec3 albedo = texture(u_Albedo, texCoords).rgb;//pow(texture(u_Albedo, texCoords).rgb, vec3(gamma));
+		vec4 materialInfo = vec4(0.f, 1.f, 1.f, 1.f);//texture(u_MaterialInfo, texCoords);
+		vec3 albedo = vec3(1.f);//texture(u_Albedo, texCoords).rgb;
 		float ao = materialInfo.r;
 		float roughness = materialInfo.g;
 		float metallic = materialInfo.b;
 
 		// Get the normal vector
-		vec3 aPos = vertices[indices[shapeHit]].position;
-
-    	vec3 v1v0 = vertices[indices[shapeHit + 1]].position - aPos;
-    	vec3 v2v0 = vertices[indices[shapeHit + 2]].position - aPos;
-		vec3 N = getNormalFromMap(cross( v1v0, v2v0 ), p0, texCoords);
+		vec3 N = GetNormal(p0);
 
 		if (dot(refRayDirection, N) > 0.f) N = -N;
 
@@ -387,18 +623,11 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec4 re
 			}
 			L = normalize(L);
 
-			vec3 H = normalize(L - refRayDirection);
-			
-			bool LightHit = false;
-			for (uint i = 0; i < numIndices; i += 3) {
-				vec3 intInfo = Intersection(p0 + 0.000001 * N, L, i);
-				if (intInfo.x > 0.f){
-					LightHit = true;
-					minT = intInfo.x;
-				} 
-			}
+			vec3 H = normalize(L - refRayDirection);	
 
-			if (!LightHit){
+            uint nu = 0;
+            float d = RayMarch(p0 + N * SURF_DIST * 2.f, L, nu);
+            if(d*d>=dot(L, vec3(1.f))){
 				float NdotL = max(dot(N, L), 0.f);
 				// Cook-Torrance BRDF
 				//float NDF = DistributionGGX(N, H, roughness);
@@ -424,7 +653,6 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec4 re
 		ref = vec4(albedo, fresnelSchlickRoughness(NdotV, F0, roughness));
 		refRayOrigin = p0 + 0.000003 * N;
 		refRayDirection = reflect(refRayDirection, N);
-		//color = vec3(0.f, 2.f, 2.f);
 	}
 	else{
 		vec3 color1 = clamp(getStars(refRayOrigin, refRayDirection, 1, 0.5) * 1.5, 0.0, 1.0) * vec3(0.0, 0.0, 1.0);
@@ -436,6 +664,10 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection, inout vec4 re
 		vec3 daySky = computeIncidentLight(vec3(refRayOrigin.x, earthRadius + 1.f, refRayOrigin.z), refRayDirection, mixer);
 		vec3 nightSky = color1 + color2 + color3 + colorStars;
 		color = mix(daySky, nightSky, mixer);
+
+		//float resT = 2000.0;
+		//vec4 res = renderClouds( refRayOrigin, refRayDirection, 0.0, resT, resT, gl_FragCoord.xy );
+    	//color = color*(1.0-res.w) + res.xyz;
 	}
 
     return color;
@@ -459,21 +691,15 @@ vec3 Render(const in vec3 rayDirection){
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / windowSize;
+    ivec2 invocID = ivec2(gl_GlobalInvocationID.xy);
+    vec2 uv = invocID / vec2(imageSize(o_Image));
     vec3 rayDir = normalize(lower_left_corner + uv.x * horizontal - uv.y * vertical - cameraPos);
 	vec3 result = Render(rayDir);
 	
 	// HDR tonemapping
 	//result = result / (result + 1.f);
 	// gamma correct
-	//result = pow(result, vec3(1.f / gamma));  
+	//result = pow(result, vec3(1.f / gamma));
 
-	// Extract the bloomy parts
-	float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
-    if(brightness > 0.5)
-        BrightColor = vec4(result, 1.0);
-    else
-        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
-
-    FragColor = vec4(result, 1.f);
+    imageStore(o_Image, invocID, vec4(result, 1.f));
 }

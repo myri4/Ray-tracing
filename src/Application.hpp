@@ -6,6 +6,7 @@
 #include "GUI/Textbox.hpp"
 #include "GUI/Button.hpp"
 #include <wc/Model/Model.hpp>
+#include <filesystem>
 
 namespace wc {
 
@@ -15,26 +16,21 @@ namespace wc {
 		float deltaTime = 0.f;
 
 		// FrameBuffer stuff
-		gl::VertexBuffer scrQuad;
-		gl::VertexArray scrQuadA;
-		gl::Shader screenShader;
-		gl::FrameBuffer screen;
+		gl::ComputeShader screenShader;
 		gl::Texture scrTexture;
 		// Composite buffer
-		gl::VertexBuffer compositeQuad;
-		gl::VertexArray compositeQuadA;
-		gl::Shader compositeShader;
+		gl::Texture finalImage;
+		gl::ComputeShader compositeShader;
 
 		gl::Texture bloomBuffers[3];
 
 		struct SceneData
 		{
-			glm::vec2 windowSize;
-			alignas(16) glm::vec3 lower_left_corner;
-			alignas(16) glm::vec3 horizontal;
-			alignas(16) glm::vec3 vertical;
-			alignas(16) glm::vec3 cameraPos;
-			uint32_t numIndices = 0;
+			alignas(16) glm::vec3 lower_left_corner = glm::vec3(0.f);
+			alignas(16) glm::vec3 horizontal = glm::vec3(0.f);
+			alignas(16) glm::vec3 vertical = glm::vec3(0.f);
+			alignas(16) glm::vec3 cameraPos = glm::vec3(0.f);
+			uint32_t IndexCount = 0;
 			uint32_t numLights = 0;
 			uint32_t maxBounces = 1; // @TODO: remove
 		}sceneData;
@@ -44,13 +40,12 @@ namespace wc {
 		}
 
 		gl::UniformBuffer sceneDataBuffer;
-		gl::UniformBuffer vertexBuffer;
-		gl::UniformBuffer indexBuffer;
+		gl::ShaderStorageBuffer vertexBuffer;
+		gl::ShaderStorageBuffer indexBuffer;
 		gl::UniformBuffer lights;
 
 		gl::Texture u_Albedo;
 		gl::Texture u_MaterialInfo;
-		gl::Texture u_Normal;
 
 		gl::ComputeShader bloomShader;
 		gl::UniformBuffer bloomUBO;
@@ -73,14 +68,13 @@ namespace wc {
 		{
 			float Threshold = 1.f;
 			float Knee = 0.1f;
-			float Intensity = 0.1f;
 		}bloomSettings;
 
 		Camera camera;
 #define NUM_LIGHTS 16
 		struct Light {
+			glm::vec3 vector;
 			uint32_t color;
-			alignas(16) glm::vec3 vector;
 		} lighting[NUM_LIGHTS];
 		bool lightUpdate = false;
 
@@ -105,9 +99,9 @@ namespace wc {
 				}
 		}
 
-		glm::ivec2 bloomTexSize;
-		int32_t mBloomComputeWorkGroupSize = 16;
-		int32_t mips = 1;
+		glm::ivec2 bloomTexSize = glm::ivec2(0);
+		uint32_t m_BloomComputeWorkGroupSize = 4;
+		uint32_t mips = 1;
 		void RenderBloom()
 		{
 			bloomShader.use();
@@ -116,14 +110,14 @@ namespace wc {
 			bloomUBO.SetData(0, sizeof(BloomUBOSettings), &settings);
 			bloomBuffers[0].BindTextureImage(0, GL_WRITE_ONLY);
 			scrTexture.Bind(1);
-			bloomShader.Dispatch(glm::ceil(glm::vec2(bloomTexSize) / glm::vec2(mBloomComputeWorkGroupSize)));
+			bloomShader.Dispatch(glm::ceil(glm::vec2(bloomTexSize) / glm::vec2(m_BloomComputeWorkGroupSize)));
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 			bloomBuffers[0].Bind(1);
 			for (int currentMip = 1; currentMip < mips; currentMip++)
 			{
 				glm::vec2 mipSize = bloomBuffers[0].GetMipSize(currentMip);
-				mipSize = glm::ceil(mipSize / glm::vec2(mBloomComputeWorkGroupSize));
+				mipSize = glm::ceil(mipSize / glm::vec2(m_BloomComputeWorkGroupSize));
 				settings.Mode = (int)BloomMode::Downsample;
 			
 				// Ping 
@@ -152,7 +146,7 @@ namespace wc {
 			bloomBuffers[2].BindTextureImage(0, GL_WRITE_ONLY, mips - 1);
 			bloomBuffers[0].Bind(1);
 			
-			bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(mips - 1) / glm::vec2(mBloomComputeWorkGroupSize)));
+			bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(mips - 1) / glm::vec2(m_BloomComputeWorkGroupSize)));
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			
 			bloomBuffers[2].Bind(2);
@@ -164,11 +158,12 @@ namespace wc {
 			
 				bloomBuffers[2].BindTextureImage(0, GL_WRITE_ONLY, currentMip);
 			
-				bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(currentMip) / glm::vec2(mBloomComputeWorkGroupSize)));
+				bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(currentMip) / glm::vec2(m_BloomComputeWorkGroupSize)));
 				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);				
 			}
 		}
 
+		int alignment = 0;
 		Font font;
 		float MouseSensitivity = 5.f;
 		//----------------------------------------------------------------------------------------------------------------------
@@ -181,12 +176,14 @@ namespace wc {
 			if (resized) {
 				Renderer2D::SetProjection(Renderer2D::Get2DProj(windSize));	
 
-				screen.Destroy();
 				scrTexture.Destroy();
+				finalImage.Destroy();
+
 				for (int i = 0; i < 3; i++) 
 					bloomBuffers[i].Destroy();
 				CreateScreen();
 			}
+
 			if (window.hasFocus()) {
 
 			float yaw = glm::radians(camera.Yaw);
@@ -216,13 +213,9 @@ namespace wc {
 			else if (Keyboard::isKeyPressed(Keyboard::Key::LShift))
 				camera.Position.y -= MovementSpeed;
 
-			if (Keyboard::isKeyPressed(Keyboard::Key::J)) {
-				screenShader.Destroy();
-				screenShader.Create("shaderpacks/default/screenShader.glsl");
-			}
 
-			if (Keyboard::getKey(Keyboard::Key::P)) bloomSettings.Knee += 0.01f;
-			if (Keyboard::getKey(Keyboard::Key::L)) bloomSettings.Knee -= 0.01f;
+			if (Keyboard::getKey(Keyboard::Key::P)) sceneData.maxBounces += 1;
+			if (Keyboard::getKey(Keyboard::Key::L)) sceneData.maxBounces -= 1;
 
 			if (Keyboard::isKeyPressed(Keyboard::Key::Y)) lighting[1].vector = camera.Position;
 			if (Keyboard::isKeyPressed(Keyboard::Key::C)) { camera.FOV = 10.f; MouseSensitivity = 18; }
@@ -295,13 +288,10 @@ namespace wc {
 			scrProps.wrap_t = GL_CLAMP_TO_EDGE;
 			scrProps.SetSize(window.GetSize());
 			scrTexture.Create(scrProps);
-
-			screen.Create(scrProps.Width, scrProps.Height);
-			screen.addTexture(scrTexture);
+			finalImage.Create(scrProps);
 
 			bloomTexSize = glm::ivec2(scrProps.Width, scrProps.Height) / 2;
-			bloomTexSize += glm::ivec2(mBloomComputeWorkGroupSize - bloomTexSize.x % mBloomComputeWorkGroupSize,
-				mBloomComputeWorkGroupSize - bloomTexSize.y % mBloomComputeWorkGroupSize);
+			bloomTexSize += glm::ivec2(m_BloomComputeWorkGroupSize - bloomTexSize.x % m_BloomComputeWorkGroupSize, m_BloomComputeWorkGroupSize - bloomTexSize.y % m_BloomComputeWorkGroupSize);
 			mips = scrTexture.GetMipLevelCount() - 4;
 			gl::TextureProps bloomProps;
 			bloomProps.internalFormat = GL_RGBA32F;
@@ -326,60 +316,19 @@ namespace wc {
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			screenShader.Create("shaderpacks/default/screenShader.glsl");
-			compositeShader.Create("shaderpacks/default/composite.glsl");
-			bloomShader.Create("shaderpacks/default/bloomShader.glsl");
-			{
-				float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-					// positions 
-					-1.0f, -1.0f,
-					-1.0f,  1.0f,
-					 1.0f, -1.0f,
-
-					 1.0f, -1.0f,
-					-1.0f,  1.0f,
-					 1.0f,  1.0f,
-				};
-
-				scrQuad.Create(quadVertices, sizeof(quadVertices), 0);
-				scrQuadA.Create();
-				scrQuadA.VertexAttribPointer(0, 2, 0);
-				scrQuadA.AddVertexBuffer(scrQuad, sizeof(float) * 2);
-			}
-
-			{
-				float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-				// positions   // texCoords
-				-1.0f, -1.0f,  0.0f, 1.0f,
-				-1.0f,  1.0f,  0.0f, 0.0f,
-				 1.0f, -1.0f,  1.0f, 1.0f,
-
-				 1.0f, -1.0f,  1.0f, 1.0f,
-				-1.0f,  1.0f,  0.0f, 0.0f,
-				 1.0f,  1.0f,  1.0f, 0.0f,
-				};
-
-				compositeQuad.Create(quadVertices, sizeof(quadVertices), 0);
-				compositeQuadA.Create();
-				compositeQuadA.VertexAttribPointer(0, 2, 0);
-				compositeQuadA.VertexAttribPointer(1, 2, 2 * sizeof(float));
-				compositeQuadA.AddVertexBuffer(compositeQuad, sizeof(float) * 4);
-			}
+			screenShader.Create("shaders/screenShader.comp");
+			bloomShader.Create("shaders/bloomShader.comp");
+			compositeShader.Create("shaders/composite.comp");			
 
 			font.Load("assets/font/Minecraft.ttf", 128);
 			sceneDataBuffer.Create(nullptr, sizeof(SceneData), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
 			sceneDataBuffer.BufferBase(0);
-			sceneDataBuffer.Bind();
 
 			lights.Create(nullptr, sizeof(lighting), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
 			lights.BufferBase(1);
-			lights.Bind();
 
-			BloomUBOSettings st;
-			st.Params = glm::vec4(bloomSettings.Threshold, bloomSettings.Threshold - bloomSettings.Knee, bloomSettings.Knee * 2.f, 0.25f / bloomSettings.Knee);
-			bloomUBO.Create(&st, sizeof(BloomUBOSettings), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+			bloomUBO.Create(nullptr, sizeof(BloomUBOSettings), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
 			bloomUBO.BufferBase(4);
-			bloomUBO.Bind();
 
 			Vertex vertices[8];
 			vertices[0].position = glm::vec3(1, 0.5f, 0);
@@ -402,20 +351,18 @@ namespace wc {
 			vertices[6].texCoord = glm::vec2(1.f, 1.f);
 			vertices[7].texCoord = glm::vec2(0.f, 1.f);
 
-			vertexBuffer.Create(vertices, sizeof(vertices));
+			vertexBuffer.Create(vertices, sizeof(vertices), GL_DYNAMIC_STORAGE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
 			vertexBuffer.BufferBase(2);
-			vertexBuffer.Bind();
 
-			ind indices[12] = {
+			uint32_t indices[12] = {
 				0, 1, 2, 2, 3, 0,
 				4, 5, 6, 6, 7, 4
 			};
 
 			indexBuffer.Create(indices, sizeof(indices));
 			indexBuffer.BufferBase(3);
-			indexBuffer.Bind();
 
-			sceneData.numIndices = ARRAYSIZE(indices);
+			sceneData.IndexCount = ARRAYSIZE(indices);
 
 			Renderer2D::Init();
 			Renderer2D::SetProjection(Renderer2D::Get2DProj(window.GetSize()));
@@ -423,7 +370,6 @@ namespace wc {
 			addLight(glm::vec3(0.f, 1.f, 0.f), convertColor(glm::vec4(1.f, 1.f, 1.f, 0.f)));
 			gl::load("assets/test/albedo.png", u_Albedo);
 			gl::load("assets/test/pbr_output.png", u_MaterialInfo);
-			gl::load("assets/test/normal.png", u_Normal);
 
 			CreateScreen();
 		}
@@ -434,7 +380,6 @@ namespace wc {
 			deltaTime = deltaTimer.restart();
 			auto windsize = window.GetSize();
 
-			sceneData.windowSize = window.GetSize();
 			sceneData.lower_left_corner = camera.lower_left_corner;
 			sceneData.cameraPos = camera.Position;
 			sceneData.horizontal = camera.horizontal;
@@ -448,35 +393,32 @@ namespace wc {
 
 			sceneDataBuffer.SetData(0, sizeof(sceneData), &sceneData);
 
-			u_Albedo.Bind(0);
-			u_MaterialInfo.Bind(1);
-			u_Normal.Bind(2);
-
-			screen.Bind();
+			scrTexture.BindTextureImage(0, GL_WRITE_ONLY);
+			u_Albedo.Bind(1);
+			u_MaterialInfo.Bind(2);
 
 			screenShader.use();
-			scrQuadA.Bind();	
-			Renderer::DrawArrays(6);
-			
-			screen.unbind();
-
-			float scale = 0.4f;
+			screenShader.Dispatch(glm::ceil((glm::vec2)windsize / glm::vec2(m_BloomComputeWorkGroupSize)));
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 			RenderBloom();
 
+			finalImage.BindTextureImage(0, GL_WRITE_ONLY);
+			scrTexture.Bind(1); // use the color attachment texture as the texture of the quad plane	
+			bloomBuffers[2].Bind(2);
 			compositeShader.use();
-			compositeQuadA.Bind();
-			scrTexture.Bind(); // use the color attachment texture as the texture of the quad plane			
-			bloomBuffers[2].Bind(1);
+			compositeShader.Dispatch(glm::ceil((glm::vec2)windsize / glm::vec2(m_BloomComputeWorkGroupSize)));
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-			Renderer::DrawArrays(6);
+			Renderer2D::DrawQuad({ 0,0 }, windsize, finalImage);
+
+			float scale = 0.4f;
 			Renderer2D::DrawText("FPS: " + std::to_string((int)(1.f / deltaTime)) + " Frametime: " + std::to_string(deltaTime * 1000), font, { 25.f, 5.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("X: " + std::to_string(camera.Position.x) + " Y: " + std::to_string(camera.Position.y) + " Z: " + std::to_string(camera.Position.z), font, { 25.f, 15.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("Pitch: " + std::to_string(camera.Pitch) + " Yaw: " + std::to_string(camera.Yaw), font, {25.f, 25.f * scale * 10.f}, scale);
-			Renderer2D::DrawText("Max bounces: " + std::to_string(bloomSettings.Knee), font, { 25.f, 35.f * scale * 10.f }, scale);
+			Renderer2D::DrawText("Max bounces: " + std::to_string(sceneData.maxBounces), font, { 25.f, 35.f * scale * 10.f }, scale);
 			
 			Renderer2D::Flush();
-			Renderer2D::FlushLines();
 			window.display();
 		}
 		//----------------------------------------------------------------------------------------------------------------------
