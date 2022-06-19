@@ -21,28 +21,23 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-//Internet connection
-//#include <net/wc_net.hpp>
-
 //Custom libraries
 #include <gl/Buffer.hpp>
 #include <gl/Shaders.hpp>
 #include <gl/Texture.hpp>
 #include <gl/VertexArray.hpp>
-#include <gl/FrameBuffer.hpp>
 
 #include <Maths/Camera.hpp>
-
-//Lua
-#include <sol/sol.hpp>
 
 //Util
 #include <Utils/Log.hpp>
 #include <Utils/Time.hpp>
 #include <Utils/State.hpp>
-#include <Utils/Random.hpp>
 #include <Utils/Window.hpp>
 
 // GUI
 #include <GUI/Renderer2D.hpp>
-#include <GUI/AssetManager.hpp>
+
+// Game idea
+// Space ship game where you go around planets, gather resources then go and fight people an invade their spaceships, until you invde all the galaxy
+// Type: strategy, fps

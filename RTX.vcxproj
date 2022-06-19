@@ -132,7 +132,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -168,7 +168,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>liblua54.a;freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>freetype.lib;glfw3.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -178,16 +178,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\gl\Camera.h" />
-    <ClInclude Include="common\gl\TextureArray.hpp" />
     <ClInclude Include="common\gl\VertexArray.hpp" />
-    <ClInclude Include="common\GUI\AssetManager.hpp" />
-    <ClInclude Include="common\GUI\Button.hpp" />
     <ClInclude Include="common\GUI\Renderer2D.hpp" />
-    <ClInclude Include="common\GUI\Textbox.hpp" />
     <ClInclude Include="common\Maths\Camera.hpp" />
     <ClInclude Include="common\gl\Cubemap.h" />
     <ClInclude Include="common\gl\FrameBuffer.h" />
-    <ClInclude Include="common\gl\FrameBuffer.hpp" />
     <ClInclude Include="common\gl\glErrors.h" />
     <ClInclude Include="common\gl\IndexBuffer.h" />
     <ClInclude Include="common\gl\Shaders.h" />
@@ -211,7 +206,6 @@
     <ClInclude Include="common\gl\Texture.hpp" />
     <ClInclude Include="common\gl\VertexArray.h" />
     <ClInclude Include="common\gl\Buffer.hpp" />
-    <ClInclude Include="common\Maths\Frustum.hpp" />
     <ClInclude Include="common\Utils\Log.hpp" />
     <ClInclude Include="common\Utils\Random.hpp" />
     <ClInclude Include="common\Utilitiess\State.h" />
@@ -231,7 +225,6 @@
     <ClInclude Include="gl\VertexArray.h" />
     <ClInclude Include="common\Utils\NonCopyable.hpp" />
     <ClInclude Include="src\Block.h" />
-    <ClInclude Include="common\Maths\Ray.hpp" />
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="common\Utilitiess\Log.h" />
@@ -242,7 +235,6 @@
     <ClInclude Include="vendor\Include\FastNoise\FastNoiseLite.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="config\window.lua" />
     <None Include="scripts\blocks.lua" />
     <None Include="scripts\coal_ore.lua" />
     <None Include="scripts\dead_bush.lua" />

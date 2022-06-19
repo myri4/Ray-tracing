@@ -1,12 +1,8 @@
 #pragma once
 //#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_FORCE_INTRINSICS 
-#include "wc/pch.hpp"
-#include <glm/matrix.hpp>
-#include "GUI/Textbox.hpp"
-#include "GUI/Button.hpp"
-#include <wc/Model/Model.hpp>
-#include <filesystem>
+#include <wc/pch.hpp>
+#include <wc/Model/Mesh.hpp>
 
 namespace wc {
 
@@ -35,14 +31,9 @@ namespace wc {
 			uint32_t maxBounces = 1; // @TODO: remove
 		}sceneData;
 
-		glm::vec3 CalculateNormal(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
-			return glm::normalize(glm::cross(c - a, b - a));
-		}
-
 		gl::UniformBuffer sceneDataBuffer;
 		gl::ShaderStorageBuffer vertexBuffer;
 		gl::ShaderStorageBuffer indexBuffer;
-		gl::UniformBuffer lights;
 
 		gl::Texture u_Albedo;
 		gl::Texture u_MaterialInfo;
@@ -72,9 +63,11 @@ namespace wc {
 
 		Camera camera;
 #define NUM_LIGHTS 16
+
+		gl::UniformBuffer lights;
 		struct Light {
-			glm::vec3 vector;
-			uint32_t color;
+			glm::vec3 vector = glm::vec3(0.f);
+			uint32_t color = 0;
 		} lighting[NUM_LIGHTS];
 		bool lightUpdate = false;
 
@@ -174,7 +167,8 @@ namespace wc {
 		void OnInput() override {
 			auto windSize = window.GetSize();
 			if (resized) {
-				Renderer2D::SetProjection(Renderer2D::Get2DProj(windSize));	
+				glViewport(0, 0, windSize.x, windSize.y);
+				Renderer2D::m_Data.windowSize = windSize;
 
 				scrTexture.Destroy();
 				finalImage.Destroy();
@@ -253,7 +247,7 @@ namespace wc {
 			if (camera.Yaw > 360.f) camera.Yaw = 0.f;
 			else if (camera.Yaw < 0.f) camera.Yaw = 360.f;
 
-			camera.UpdateCameraAngles();
+			camera.Update();
 			Mouse::SetMousePosition(xt, yt);
 			}
 		}
@@ -309,7 +303,8 @@ namespace wc {
 		}
 
 		void OnCreate() override {
-			window.Create("config/window.lua", "Real-time ray tracing");
+			window.Create({ 1024, 1024 }, "RTX");
+			if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) WC_ERROR("Failed to initialize GLAD");
 			// OpenGL state
 			Renderer::enableDebuging();
 			// ------------
@@ -365,7 +360,7 @@ namespace wc {
 			sceneData.IndexCount = ARRAYSIZE(indices);
 
 			Renderer2D::Init();
-			Renderer2D::SetProjection(Renderer2D::Get2DProj(window.GetSize()));
+			Renderer2D::m_Data.windowSize = window.GetSize();
 
 			addLight(glm::vec3(0.f, 1.f, 0.f), convertColor(glm::vec4(1.f, 1.f, 1.f, 0.f)));
 			gl::load("assets/test/albedo.png", u_Albedo);
@@ -388,32 +383,31 @@ namespace wc {
 			angle = glm::mod(angle, 360.f);
 			lighting[0].vector = -glm::vec3(glm::vec4(1.f, 0.f, 0.f, 0.f) * glm::rotate(glm::mat4(1.f), glm::radians(angle), glm::vec3(0.f, 0.f, 1.f)));
 			lighting[1].color = convertColor(glm::vec4(0.f, 1.f, 1.f, intensity / 255.f));
-
+			
 			lights.SetData(0, sizeof(lighting), lighting);
-
+			
 			sceneDataBuffer.SetData(0, sizeof(sceneData), &sceneData);
 
 			scrTexture.BindTextureImage(0, GL_WRITE_ONLY);
 			u_Albedo.Bind(1);
 			u_MaterialInfo.Bind(2);
-
+			
 			screenShader.use();
 			screenShader.Dispatch(glm::ceil((glm::vec2)windsize / glm::vec2(m_BloomComputeWorkGroupSize)));
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 			RenderBloom();
-
+			
 			finalImage.BindTextureImage(0, GL_WRITE_ONLY);
 			scrTexture.Bind(1); // use the color attachment texture as the texture of the quad plane	
 			bloomBuffers[2].Bind(2);
 			compositeShader.use();
 			compositeShader.Dispatch(glm::ceil((glm::vec2)windsize / glm::vec2(m_BloomComputeWorkGroupSize)));
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
 			Renderer2D::DrawQuad({ 0,0 }, windsize, finalImage);
 
 			float scale = 0.4f;
-			Renderer2D::DrawText("FPS: " + std::to_string((int)(1.f / deltaTime)) + " Frametime: " + std::to_string(deltaTime * 1000), font, { 25.f, 5.f * scale * 10.f }, scale);
+			Renderer2D::DrawText("FPS: " + std::to_string((int)(1.f / deltaTime)), font, { 25.f, 5.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("X: " + std::to_string(camera.Position.x) + " Y: " + std::to_string(camera.Position.y) + " Z: " + std::to_string(camera.Position.z), font, { 25.f, 15.f * scale * 10.f }, scale);
 			Renderer2D::DrawText("Pitch: " + std::to_string(camera.Pitch) + " Yaw: " + std::to_string(camera.Yaw), font, {25.f, 25.f * scale * 10.f}, scale);
 			Renderer2D::DrawText("Max bounces: " + std::to_string(sceneData.maxBounces), font, { 25.f, 35.f * scale * 10.f }, scale);
@@ -422,7 +416,9 @@ namespace wc {
 			window.display();
 		}
 		//----------------------------------------------------------------------------------------------------------------------
-		void OnDelete() override {}
+		void OnDelete() override {
+			wc::window.Destroy();
+		}
 		//----------------------------------------------------------------------------------------------------------------------
 	public:
 		Application() {}

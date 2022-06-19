@@ -1,9 +1,8 @@
 #pragma once
 
-#include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <glm/glm.hpp>
-#include <sol/sol.hpp>
 #include "Log.hpp"
 
 namespace wc {
@@ -11,10 +10,7 @@ namespace wc {
 	bool resized = false;
 
 	double scrollX = 0.f, scrollY = 0.f;
-	bool mouseScrolled = false;
-	uint32_t currKeyEntered = 0; 
-	bool keyEntered = false;
-	bool buttonPressed = false;
+	uint32_t currKeyEntered = 0;
     int mouseButtons[GLFW_MOUSE_BUTTON_LAST];
     int keyButtons[GLFW_KEY_LAST];
 
@@ -23,36 +19,30 @@ namespace wc {
 		Window() {}
 		~Window() {}
 
-		void Create(const char* luaScript, const char* title) {
-			sol::state windowScript;
-			windowScript.script_file(luaScript);
+		void Create(const glm::ivec2& windowSize, const char* title, const bool& fullscreen = false) {
 
 			GLFWmonitor* mode = nullptr;
-			if (windowScript["fullscreen"]) mode = glfwGetPrimaryMonitor();
+			if (fullscreen) mode = glfwGetPrimaryMonitor();
 
-			window = glfwCreateWindow(windowScript["screenWidth"], windowScript["screenHeight"], title, mode, nullptr);
+			window = glfwCreateWindow(windowSize.x, windowSize.y, title, mode, nullptr);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 			glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-			glfwWindowHint(GLFW_SAMPLES, windowScript["antialiasingLevel"]);
 			glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 
-			bool vsync = windowScript["vsync"];
 			glfwMakeContextCurrent(window);
-			if (!vsync) glfwSwapInterval(0);
-			glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) {glViewport(0, 0, width, height); resized = true; });
-			glfwSetScrollCallback(window, [](GLFWwindow* window, double xoffset, double yoffset) { scrollX = xoffset; scrollY = yoffset; mouseScrolled = true; });
-			glfwSetCharCallback(window, [](GLFWwindow* window, uint32_t codepoint) { currKeyEntered = codepoint; keyEntered = true; });
+			glfwSwapInterval(0);
+
+			glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) { resized = true; });
+			glfwSetScrollCallback(window, [](GLFWwindow* window, double xoffset, double yoffset) { scrollX = xoffset; scrollY = yoffset; });
+			glfwSetCharCallback(window, [](GLFWwindow* window, uint32_t codepoint) { currKeyEntered = codepoint; });
 			glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
                 keyButtons[key] = action;
-				buttonPressed = true;
 				});
 
 			glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods) {
                 mouseButtons[button] = action;
 				});
-
-			if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) WC_ERROR("Failed to initialize GLAD");
 		}
 
 		void Destroy() const {
@@ -61,9 +51,6 @@ namespace wc {
 
 		void display() const {
 			resized = false;
-            keyEntered = false;
-			buttonPressed = false;
-			mouseScrolled = false;
             memset(mouseButtons, GLFW_RELEASE, sizeof(mouseButtons));
             memset(keyButtons, GLFW_RELEASE, sizeof(keyButtons));
 			glfwSwapBuffers(window);

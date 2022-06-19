@@ -5,14 +5,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <string>
 #include <fstream>
-#include <sstream>
 
 #include <Utils/Log.hpp>
 
 namespace wcUtil {
-	void checkCompileErrors(const uint32_t& shader) {
+	void checkLinkErrors(const uint32_t& shader) {
 		int success;
 		char infoLog[1024];
 		glGetProgramiv(shader, GL_LINK_STATUS, &success);
@@ -53,8 +51,7 @@ namespace gl {
 	class Shader {
 		uint32_t m_RendererID = 0;
 	public:
-		Shader() {}
-		~Shader() { Destroy(); }
+		Shader() = default;
 
 		void Create(const char* vertexPath, const char* fragmentPath) {
 			if (!m_RendererID) {
@@ -65,23 +62,14 @@ namespace gl {
 				glAttachShader(m_RendererID, vertex);
 				glAttachShader(m_RendererID, fragment);
 				glLinkProgram(m_RendererID);
-				wcUtil::checkCompileErrors(m_RendererID);
+				wcUtil::checkLinkErrors(m_RendererID);
 				// delete the shaders as they're linked into our program now and no longer necessary
 				glDeleteShader(vertex);
 				glDeleteShader(fragment);
 			}
 		}
-		// activate the shader
-		// ------------------------------------------------------------------------
-		void use() const
-		{
-			glUseProgram(m_RendererID);
-		}
 
-		void setMat4(const uint32_t& loc, const glm::mat4& mat) const
-		{
-			glProgramUniformMatrix4fv(m_RendererID, loc, 1, false, glm::value_ptr(mat));
-		}
+		void use() const { glUseProgram(m_RendererID); }
 
 		inline operator uint32_t& () { return m_RendererID; }
 		inline operator const uint32_t& () const { return m_RendererID; }
@@ -103,33 +91,21 @@ namespace gl {
 
 				uint32_t compute = wcUtil::CompileShader(code, GL_COMPUTE_SHADER);
 
-				// shader Program
 				m_RendererID = glCreateProgram();
 				glAttachShader(m_RendererID, compute);
 				glLinkProgram(m_RendererID);
-				wcUtil::checkCompileErrors(m_RendererID);
-				// delete the shaders as they're linked into our program now and no longer necessary
+
 				glDeleteShader(compute);
 			}
 		}
-		// activate the shader
-		// ------------------------------------------------------------------------
-		void use() const
-		{
-			glUseProgram(m_RendererID);
-		}
 
-		void Dispatch(const GLuint& num_groups_x, const GLuint& num_groups_y, const GLuint& num_groups_z) {
-			glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
-		}
+		void use() const { glUseProgram(m_RendererID); }
 
-		void Dispatch(const glm::vec3& num_groups) {
-			glDispatchCompute(num_groups.x, num_groups.y, num_groups.z);
-		}
+		void Dispatch(const GLuint& num_groups_x, const GLuint& num_groups_y, const GLuint& num_groups_z) {	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z); }
 
-		void Dispatch(const glm::vec2& num_groups) {
-			glDispatchCompute(num_groups.x, num_groups.y, 1);
-		}
+		void Dispatch(const glm::vec3& num_groups) { glDispatchCompute(num_groups.x, num_groups.y, num_groups.z); }
+
+		void Dispatch(const glm::vec2& num_groups) { glDispatchCompute(num_groups.x, num_groups.y, 1); }
 
 		inline operator uint32_t& () { return m_RendererID; }
 		inline operator const uint32_t& () const { return m_RendererID; }

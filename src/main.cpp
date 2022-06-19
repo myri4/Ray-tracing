@@ -13,8 +13,7 @@ int main() {
 	glfwInit();
 	
 	app.Start();
-	wc::window.Destroy();
-	glfwTerminate();
 
+	glfwTerminate();
 	return 0;
 }

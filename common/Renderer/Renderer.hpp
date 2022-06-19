@@ -66,7 +66,5 @@ namespace wc {
                 //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, true);
             }
         }
-
-        void SetLineWidth(const float& width) { glLineWidth(width); }
     }    
 }

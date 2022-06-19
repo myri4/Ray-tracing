@@ -97,16 +97,16 @@ namespace wc {
 			uint32_t IndexCount = 0;
 			uint32_t TextureSlots[MaxTextures] = { 0 };
 			uint32_t byteOffset = 0;
-			uint8_t TextureSlotIndex = 1;
-			gl::Texture whiteTexture;
+			uint8_t TextureSlotIndex = 0;
 			gl::VertexBuffer m_VBO;
 			gl::VertexArray m_VAO;
 			gl::IndexBuffer m_EBO;
+			glm::vec2 windowSize = glm::vec2(0.f);
 
 			gl::Shader m_Shader;
 		} m_Data;
 
-		void Init(const bool& lines = false) {
+		void Init() {
 			// Quad Rendering
 			uint32_t indices[MaxQuadIndexCount];
 			uint32_t offset = 0;
@@ -135,15 +135,7 @@ namespace wc {
 
 			m_Data.m_Shader.Create("shaders/Renderer2D.vert", "shaders/Renderer2D.frag");
 
-			float color[] = { 1.f, 1.f, 1.f };
-			m_Data.whiteTexture.Create(color, 1, 1);
-			m_Data.TextureSlots[0] = m_Data.whiteTexture;
-
-			for (uint8_t i = 1; i < MaxTextures; i++) m_Data.TextureSlots[i] = 0;
-		}
-
-		void SetProjection(const glm::mat4& proj) {
-			m_Data.m_Shader.setMat4(0, proj);
+			for (uint8_t i = 0; i < MaxTextures; i++) m_Data.TextureSlots[i] = 0;
 		}
 
 		void Flush() {
@@ -157,23 +149,7 @@ namespace wc {
 			Renderer::DrawIndexed(m_Data.IndexCount);
 			m_Data.IndexCount = 0;
 			m_Data.byteOffset = 0;
-			m_Data.TextureSlotIndex = 1;
-		}
-
-		void DrawQuad(const glm::vec2& pos, const glm::vec2& size, const glm::vec4& color = glm::vec4(1.f)) {
-			if (m_Data.IndexCount >= MaxQuadIndexCount) Flush();
-
-			uint32_t Color = (uint32_t)(color.r * 255.f) << 24 | (uint32_t)(color.g * 255.f) << 16 | (uint32_t)(color.b * 255.f) << 8 | (uint32_t)(color.a * 255.f);
-
-			Vertex2D vertices[4];
-			vertices[0] = Vertex2D({ pos.x + size.x, pos.y + size.y }, { 1.f, 1.f, 0.f }, Color, 0.f);
-			vertices[1] = Vertex2D({ pos.x,			 pos.y + size.y }, { 0.f, 1.f, 0.f }, Color, 0.f);
-			vertices[2] = Vertex2D({ pos.x,			 pos.y, }, { 0.f, 0.f, 0.f }, Color, 0.f);
-			vertices[3] = Vertex2D({ pos.x + size.x, pos.y, }, { 1.f, 0.f, 0.f }, Color, 0.f);
-
-			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
-			m_Data.byteOffset += sizeof(vertices);
-			m_Data.IndexCount += 6;
+			m_Data.TextureSlotIndex = 0;
 		}
 
 		void DrawQuad(const glm::vec2& pos, const glm::vec2& size, const gl::Texture& tex, const glm::vec2& textureStart, const glm::vec2& textureEnd, const glm::vec4& color = glm::vec4(1.f)) {
@@ -181,7 +157,7 @@ namespace wc {
 
 			float textureIndex = 0.f;
 			uint32_t texID = tex;
-			for (uint8_t i = 1; i < m_Data.TextureSlotIndex; i++) {
+			for (uint8_t i = 0; i < m_Data.TextureSlotIndex; i++) {
 				if (m_Data.TextureSlots[i] == texID) {
 					textureIndex = (float)i;
 					break;
@@ -204,6 +180,12 @@ namespace wc {
 			vertices[2] = Vertex2D({ pos.x,			 pos.y, },         { textureStart.x * tsx, textureStart.y * tsy, textureIndex }, Color, 0);
 			vertices[3] = Vertex2D({ pos.x + size.x, pos.y, },         { textureEnd.x   * tsx, textureStart.y * tsy, textureIndex }, Color, 0);
 
+			for (uint8_t i = 0; i < 4; i++) {
+				glm::vec2& Pos = vertices[i].Position;
+				Pos = ((vertices[i].Position / m_Data.windowSize) * 2.f - 1.f);
+				Pos.y = -Pos.y;
+			}
+
 			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
 			m_Data.byteOffset += sizeof(vertices);
 			m_Data.IndexCount += 6;
@@ -213,7 +195,7 @@ namespace wc {
 			if (m_Data.IndexCount >= MaxQuadIndexCount || m_Data.TextureSlotIndex > MaxTextures - 1) Flush();
 
 			float textureIndex = 0.f;
-			for (uint8_t i = 1; i < m_Data.TextureSlotIndex; i++) {
+			for (uint8_t i = 0; i < m_Data.TextureSlotIndex; i++) {
 				if (m_Data.TextureSlots[i] == texID) {
 					textureIndex = (float)i;
 					break;
@@ -233,38 +215,11 @@ namespace wc {
 			vertices[2] = Vertex2D({ pos.x,			 pos.y, }, { 0.f, 0.f, textureIndex }, Color, Type);
 			vertices[3] = Vertex2D({ pos.x + size.x, pos.y, }, { 1.f, 0.f, textureIndex }, Color, Type);
 
-			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
-			m_Data.byteOffset += sizeof(vertices);
-			m_Data.IndexCount += 6;
-		}
-
-		void DrawQuadIndexedSprite(const glm::vec2& pos, const glm::vec2& size, const gl::Texture& tex, const glm::vec2& coords, const glm::vec2& sprSize, const glm::vec4& color = glm::vec4(1.f)) {
-			if (m_Data.IndexCount >= MaxQuadIndexCount || m_Data.TextureSlotIndex > MaxTextures - 1) Flush();
-
-			float textureIndex = 0.f;
-			uint32_t texID = tex;
-			for (uint8_t i = 1; i < m_Data.TextureSlotIndex; i++) {
-				if (m_Data.TextureSlots[i] == texID) {
-					textureIndex = (float)i;
-					break;
-				}
+			for (uint8_t i = 0; i < 4; i++) {
+				glm::vec2& Pos = vertices[i].Position;
+				Pos = ((vertices[i].Position / m_Data.windowSize) * 2.f - 1.f);
+				Pos.y = -Pos.y;
 			}
-
-			if (textureIndex == 0.f) {
-				textureIndex = (float)m_Data.TextureSlotIndex;
-				m_Data.TextureSlots[m_Data.TextureSlotIndex] = texID;
-				m_Data.TextureSlotIndex++;
-			}
-
-			float tsx = 1.f / tex.GetSize().x;
-			float tsy = 1.f / tex.GetSize().y;
-
-			uint32_t Color = (uint32_t)(color.r * 255.f) << 24 | (uint32_t)(color.g * 255.f) << 16 | (uint32_t)(color.b * 255.f) << 8 | (uint32_t)(color.a * 255.f);
-			Vertex2D vertices[4];
-			vertices[0] = Vertex2D({ pos.x + size.x, pos.y + size.y }, { (coords.x * sprSize.x) * tsx, ((coords.y + 1) * sprSize.y) * tsy, textureIndex }, Color, 0);
-			vertices[1] = Vertex2D({ pos.x,			 pos.y + size.y }, { ((coords.x + 1) * sprSize.x) * tsx, ((coords.y + 1) * sprSize.y) * tsy, textureIndex }, Color, 0);
-			vertices[2] = Vertex2D({ pos.x,			 pos.y, }, { ((coords.x + 1) * sprSize.x) * tsx, (coords.y * sprSize.y) * tsy, textureIndex }, Color, 0);
-			vertices[3] = Vertex2D({ pos.x + size.x, pos.y, }, { (coords.x * sprSize.x) * tsx, (coords.y * sprSize.y) * tsy, textureIndex }, Color, 0);
 
 			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
 			m_Data.byteOffset += sizeof(vertices);
@@ -288,7 +243,5 @@ namespace wc {
 				pos.x += (ch.Advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
 			}
 		}
-
-		glm::mat4 Get2DProj(const glm::vec2& windowSize) { return glm::ortho(0.f, windowSize.x, windowSize.y, 0.f); }
 	}
 }
