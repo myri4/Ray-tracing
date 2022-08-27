@@ -98,9 +98,9 @@ namespace wc {
 			uint32_t TextureSlots[MaxTextures] = { 0 };
 			uint32_t byteOffset = 0;
 			uint8_t TextureSlotIndex = 0;
-			gl::VertexBuffer m_VBO;
+			gl::Buffer<Vertex2D> m_VBO;
 			gl::VertexArray m_VAO;
-			gl::IndexBuffer m_EBO;
+			gl::Buffer<uint32_t> m_EBO;
 			glm::vec2 windowSize = glm::vec2(0.f);
 
 			gl::Shader m_Shader;
@@ -123,9 +123,9 @@ namespace wc {
 				offset += 4;
 			}
 
-			m_Data.m_EBO.Create(indices, sizeof(indices), GL_DYNAMIC_STORAGE_BIT);
+			m_Data.m_EBO.Create(GL_DYNAMIC_STORAGE_BIT, MaxQuadIndexCount, indices);
 			m_Data.m_VAO.Create();
-			m_Data.m_VBO.Create(nullptr, MaxQuadVertexCount * sizeof(Vertex2D), GL_DYNAMIC_STORAGE_BIT);
+			m_Data.m_VBO.Create(GL_DYNAMIC_STORAGE_BIT, MaxQuadVertexCount);
 			m_Data.m_VAO.VertexAttribPointer(0, 2, offsetof(Vertex2D, Position));
 			m_Data.m_VAO.VertexAttribPointer(1, 3, offsetof(Vertex2D, TexCoords));
 			m_Data.m_VAO.VertexAttribPointer(2, 1, offsetof(Vertex2D, Color));
@@ -186,8 +186,8 @@ namespace wc {
 				Pos.y = -Pos.y;
 			}
 
-			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
-			m_Data.byteOffset += sizeof(vertices);
+			m_Data.m_VBO.SetData(4, vertices, m_Data.byteOffset);
+			m_Data.byteOffset += 4;
 			m_Data.IndexCount += 6;
 		}
 
@@ -221,8 +221,8 @@ namespace wc {
 				Pos.y = -Pos.y;
 			}
 
-			m_Data.m_VBO.SetData(m_Data.byteOffset, sizeof(vertices), vertices);
-			m_Data.byteOffset += sizeof(vertices);
+			m_Data.m_VBO.SetData(4, vertices, m_Data.byteOffset);
+			m_Data.byteOffset += 4;
 			m_Data.IndexCount += 6;
 		}
 #undef DrawText

@@ -26,6 +26,7 @@
 #include <gl/Shaders.hpp>
 #include <gl/Texture.hpp>
 #include <gl/VertexArray.hpp>
+#include <gl/Fence.h>
 
 #include <Maths/Camera.hpp>
 

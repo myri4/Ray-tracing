@@ -39,10 +39,10 @@ namespace wcUtil {
 		return buffer;
 	}
 
-	uint32_t CompileShader(const std::vector<char>& code, const uint32_t& type) {
+	uint32_t CompileShader(const std::vector<char>& code, const uint32_t& type, const uint32_t numSpecializationConstants = 0, const uint32_t* pConstantIndex = nullptr, const uint32_t* pConstantValue = nullptr) {
 		uint32_t shader = glCreateShader(type);
 		glShaderBinary(1, &shader, GL_SHADER_BINARY_FORMAT_SPIR_V, reinterpret_cast<const uint32_t*>(code.data()), code.size());
-		glSpecializeShader(shader, "main", 0, nullptr, nullptr);
+		glSpecializeShader(shader, "main", 0, pConstantIndex, pConstantValue);
 		return shader;
 	}
 }
@@ -85,11 +85,11 @@ namespace gl {
 	public:
 		ComputeShader() {}
 
-		void Create(const char* path) {
+		void Create(const char* path, const uint32_t numSpecializationConstants = 0, const uint32_t* pConstantIndex = nullptr, const uint32_t* pConstantValue = nullptr) {
 			if (!m_RendererID) {
 				std::vector<char> code = wcUtil::readFile(path);
 
-				uint32_t compute = wcUtil::CompileShader(code, GL_COMPUTE_SHADER);
+				uint32_t compute = wcUtil::CompileShader(code, GL_COMPUTE_SHADER, numSpecializationConstants, pConstantIndex, pConstantValue);
 
 				m_RendererID = glCreateProgram();
 				glAttachShader(m_RendererID, compute);
