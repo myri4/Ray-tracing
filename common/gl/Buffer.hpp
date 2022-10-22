@@ -46,6 +46,7 @@ namespace gl {
 
     template<typename T>
     using UniformBuffer = IndexedBuffer<GL_UNIFORM_BUFFER, T>;
+
     template<typename T>
-    using ShaderStorageBuffer = IndexedBuffer<GL_SHADER_STORAGE_BUFFER, T>;
+    using ShaderStorageBuffer = IndexedBuffer<GL_SHADER_STORAGE_BUFFER, T>; 
 }

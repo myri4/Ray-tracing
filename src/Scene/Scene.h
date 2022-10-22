@@ -39,7 +39,7 @@ namespace wc {
 		Upsample
 	};
 
-	struct BloomUBOSettings {
+	struct BloomBufferSettings {
 		glm::vec4 Params = glm::vec4(1.f); // (x) threshold, (y) threshold - knee, (z) knee * 2, (w) 0.25 / knee
 		float LOD = 0.f;
 		int Mode = (int)BloomMode::Prefilter;
@@ -86,7 +86,7 @@ namespace wc {
 
 		// Data gpu buffers
 		gl::UniformBuffer<SceneData> dataBuffer;
-		gl::UniformBuffer<BloomUBOSettings> bloomUBO;
+		gl::UniformBuffer<BloomBufferSettings> bloomUBO;
 		gl::UniformBuffer<Light> lightBuffer;
 		gl::ShaderStorageBuffer<Vertex> vertexBuffer;
 		gl::ShaderStorageBuffer<uint32_t> indexBuffer;
@@ -96,6 +96,7 @@ namespace wc {
 		gl::ShaderStorageBuffer<Chunk> chunkBuffer;
 		//gl::Texture3D voxelData;
 		gl::ShaderStorageBuffer<uint8_t> voxelData;
+
 
 		Model model;
 		glm::vec3 sunAngle = glm::vec3(0.f);
@@ -187,62 +188,56 @@ namespace wc {
 
 		void RenderBloom()
 		{
-			bloomShader.use();
-			BloomUBOSettings settings;
+			bloomShader.Bind();
+			BloomBufferSettings settings;
 			settings.Params = glm::vec4(bloomSettings.Threshold, bloomSettings.Threshold - bloomSettings.Knee, bloomSettings.Knee * 2.f, 0.25f / bloomSettings.Knee);
 			bloomUBO.SetData(1, &settings);
-			bloomBuffers[0].BindTextureImage(0, GL_WRITE_ONLY);
+			bloomBuffers[0].BindImage(0);
 			scrTexture.Bind(1);
+			bloomBuffers[2].Bind(2);
 			bloomShader.Dispatch(glm::ceil(glm::vec2(bloomTexSize) / glm::vec2(m_BloomComputeWorkGroupSize)));
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-			bloomBuffers[0].Bind(1);
+			settings.Mode = (int)BloomMode::Downsample;
 			for (int currentMip = 1; currentMip < mips; currentMip++)
 			{
-				glm::vec2 mipSize = bloomBuffers[0].GetMipSize(currentMip);
-				mipSize = glm::ceil(mipSize / glm::vec2(m_BloomComputeWorkGroupSize));
-				settings.Mode = (int)BloomMode::Downsample;
+				glm::vec2 dispatchSize = glm::ceil((glm::vec2)bloomBuffers[0].GetMipSize(currentMip) / glm::vec2(m_BloomComputeWorkGroupSize));
 
 				// Ping 
-				settings.LOD = currentMip - 1;
+				settings.LOD = float(currentMip - 1);
 				bloomUBO.SetData(1, &settings);
 
-				bloomBuffers[1].BindTextureImage(0, GL_WRITE_ONLY, currentMip);
-				bloomShader.Dispatch(mipSize);
-				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+				bloomBuffers[1].BindImage(0, currentMip);
+				if (currentMip == 1) bloomBuffers[0].Bind(1);
+				bloomShader.Dispatch(dispatchSize);
 
 				// Pong 
-				settings.LOD = currentMip;
+				settings.LOD = float(currentMip);
 				bloomUBO.SetData(1, &settings);
 
-				bloomBuffers[0].BindTextureImage(0, GL_WRITE_ONLY, currentMip);
+				bloomBuffers[0].BindImage(0, currentMip);
 				bloomBuffers[1].Bind(1);
-				bloomShader.Dispatch(mipSize);
-				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+				bloomShader.Dispatch(dispatchSize);
 			}
 
 			// First Upsample		
-			settings.LOD = mips - 2;
+			settings.LOD = float(mips - 2);
 			settings.Mode = (int)BloomMode::UpsampleFirst;
 			bloomUBO.SetData(1, &settings);
 
-			bloomBuffers[2].BindTextureImage(0, GL_WRITE_ONLY, mips - 1);
+			bloomBuffers[2].BindImage(0, mips - 1);
 			bloomBuffers[0].Bind(1);
 
 			bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(mips - 1) / glm::vec2(m_BloomComputeWorkGroupSize)));
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-			bloomBuffers[2].Bind(2);
 			settings.Mode = (int)BloomMode::Upsample;
 			for (int currentMip = mips - 2; currentMip >= 0; currentMip--)
 			{
-				settings.LOD = currentMip;
+				settings.LOD = float(currentMip);
 				bloomUBO.SetData(1, &settings);
 
-				bloomBuffers[2].BindTextureImage(0, GL_WRITE_ONLY, currentMip);
+				bloomBuffers[2].BindImage(0, currentMip);
 
 				bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(currentMip) / glm::vec2(m_BloomComputeWorkGroupSize)));
-				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			}
 		}
 
@@ -259,26 +254,23 @@ namespace wc {
 
 			dataBuffer.BufferBase(0);
 
-			scrTexture.BindTextureImage(0, GL_WRITE_ONLY);
-			//voxelData.BindTextureImage(1, GL_READ_ONLY, 0, true);
+			scrTexture.BindImage(0);
 			u_Albedo.Bind(1);
 			u_MaterialInfo.Bind(2);
 
 			glm::vec2 dispatchSize = glm::ceil((glm::vec2)windSize / glm::vec2(m_BloomComputeWorkGroupSize));
 			//voxelData.Bind();
-			screenShader.use();
+			screenShader.Bind();
 			screenShader.Dispatch(dispatchSize);
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 			bloomUBO.BufferBase(0);
 			RenderBloom();
 
-			finalImage.BindTextureImage(0, GL_WRITE_ONLY);
+			finalImage.BindImage(0);
 			scrTexture.Bind(1); // use the color attachment texture as the texture of the quad plane	
 			bloomBuffers[2].Bind(2);
-			compositeShader.use();
+			compositeShader.Bind();
 			compositeShader.Dispatch(dispatchSize);
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 			Renderer2D::DrawQuad({ 0,0 }, windSize, finalImage);
 		}
@@ -397,23 +389,19 @@ namespace wc {
 			scrProps.wrap_t = GL_CLAMP_TO_EDGE;
 			scrProps.SetSize(window.GetSize());
 			scrTexture.Create(scrProps);
+			scrTexture.SetName("scrTexture");
 			finalImage.Create(scrProps);
+			finalImage.SetName("finalImage");
 
 			bloomTexSize = glm::ivec2(scrProps.Width, scrProps.Height) / 2;
 			bloomTexSize += glm::ivec2(m_BloomComputeWorkGroupSize - bloomTexSize.x % m_BloomComputeWorkGroupSize, m_BloomComputeWorkGroupSize - bloomTexSize.y % m_BloomComputeWorkGroupSize);
 			mips = scrTexture.GetMipLevelCount() - 4;
-			gl::TextureProps bloomProps;
-			bloomProps.internalFormat = GL_RGBA32F;
-			bloomProps.mips = mips;
-			bloomProps.min_filter = GL_LINEAR_MIPMAP_LINEAR;
-			bloomProps.mag_filter = GL_LINEAR;
-			bloomProps.wrap_s = GL_CLAMP_TO_EDGE;
-			bloomProps.wrap_t = GL_CLAMP_TO_EDGE;
+			scrProps.mips = mips;
 
-			bloomProps.SetSize(bloomTexSize);
+			scrProps.SetSize(bloomTexSize);
 			for (int i = 0; i < 3; i++) {
-				bloomBuffers[i].Create(bloomProps);
-				//bloomBuffers[i].GenerateMipMap();
+				bloomBuffers[i].Create(scrProps);
+				bloomBuffers[i].SetName("bloomBuffers[" + std::to_string(i) + "]");
 			}
 		}
 

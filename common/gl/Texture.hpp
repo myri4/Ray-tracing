@@ -73,7 +73,7 @@ namespace gl {
 
 		void Bind(const uint8_t& textureUnit = 0) const { glBindTextureUnit(textureUnit, m_RendererID);	}
 
-		void BindTextureImage(const uint8_t& textureUnit = 0, const GLenum& access = GL_READ_ONLY, const uint32_t& level = 0) {	glBindImageTexture(textureUnit, m_RendererID, level, false, 0, access, GetInternalFormat()); }
+		void BindImage(const uint8_t& textureUnit = 0, const uint32_t& level = 0, const GLenum& access = GL_WRITE_ONLY) { glBindImageTexture(textureUnit, m_RendererID, level, false, 0, access, GetInternalFormat()); }
 
 		glm::ivec2 GetMipSize(int level)
 		{
@@ -113,6 +113,10 @@ namespace gl {
 		}
 
 		void GenerateMipMap() {	glGenerateTextureMipmap(m_RendererID); }
+
+		void SetName(const std::string& name) {
+			glObjectLabel(GL_TEXTURE, m_RendererID, name.size(), name.c_str());
+		}
 
 	private:
 		uint32_t m_RendererID = 0;

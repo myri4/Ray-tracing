@@ -99,13 +99,15 @@ namespace gl {
 			}
 		}
 
-		void use() const { glUseProgram(m_RendererID); }
+		void Bind() const { glUseProgram(m_RendererID); }
 
 		void Dispatch(const GLuint& num_groups_x, const GLuint& num_groups_y, const GLuint& num_groups_z) {	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z); }
 
 		void Dispatch(const glm::vec3& num_groups) { glDispatchCompute(num_groups.x, num_groups.y, num_groups.z); }
 
 		void Dispatch(const glm::vec2& num_groups) { glDispatchCompute(num_groups.x, num_groups.y, 1); }
+
+		void DispatchIndirect(const uint32_t& buffer) { glDispatchComputeIndirect(buffer); }
 
 		inline operator uint32_t& () { return m_RendererID; }
 		inline operator const uint32_t& () const { return m_RendererID; }

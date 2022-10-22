@@ -218,6 +218,9 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 		}
 	}
 
+	float mixer = 0.f;
+	vec3 daySky = computeIncidentLight(vec3(refRayOrigin.x, earthRadius + 1.f, refRayOrigin.z), refRayDirection, mixer);
+	
 	if (minT != kInfinity) {
 		vec3 p0 = refRayOrigin + minT * refRayDirection;
 
@@ -312,6 +315,7 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 		// this ambient lighting with environment lighting).
 
 		color = ambientColor * albedo + Lo;
+		color = mix(daySky, color, mixer);
 
 		refRayOrigin = p0 + 0.000003 * N;
 		refRayDirection = reflect(refRayDirection, N);
@@ -322,11 +326,9 @@ vec3 rayTrace(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 		vec3 color3 = clamp(getStars(refRayOrigin, -refRayDirection, 3, 0.5) * 0.7, 0.0, 1.0) * vec3(1.0, 1.0, 0.0);
 		
 		vec3 colorStars = getStars(refRayOrigin, refRayDirection, 17, 0.9);
-		float mixer = 0.f;
-		vec3 daySky = computeIncidentLight(vec3(refRayOrigin.x, earthRadius + 1.f, refRayOrigin.z), refRayDirection, mixer);
 		vec3 nightSky = color1 + color2 + color3 + colorStars;
 		color = mix(daySky, nightSky, mixer);
-		color = vec3(1.f);
+		//color = vec3(1.f);
 
 		//float resT = 2000.0;
 		//vec4 res = renderClouds( refRayOrigin, refRayDirection, 0.0, resT, resT, gl_FragCoord.xy );
@@ -480,7 +482,7 @@ vec3 rayTraceVoxel(inout vec3 refRayOrigin, inout vec3 refRayDirection) {
 vec3 Render(const in vec3 rayDirection){
 	vec3 refRayOrigin = cameraPos;
 	vec3 refRayDirection = rayDirection;
-	vec3 color = rayTraceVoxel(refRayOrigin, refRayDirection);
+	vec3 color = rayTrace(refRayOrigin, refRayDirection);
 
 	return color;
 }
