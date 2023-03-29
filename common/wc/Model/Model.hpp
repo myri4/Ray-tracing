@@ -4,12 +4,28 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "Mesh.hpp"
+#define MAX_BONE_INFLUENCE 4
+#define MAX_BONE_WEIGHTS MAX_BONE_INFLUENCE * 25
+
+#include <gl/Buffer.hpp>
+#include <gl/Texture.hpp>
+#include <gl/VertexArray.hpp>
+
+#include <vector>
+#include <Renderer/Renderer.hpp>
 
 #include <unordered_map>
 #include <Maths/AssimpGLMHelpers.hpp>
 #undef max
 namespace wc {
+
+	struct Vertex {
+		glm::vec2 texCoord = glm::vec2(0.f);
+		alignas(16) glm::vec3 position = glm::vec3(0.f);
+
+		Vertex() = default;
+		Vertex(const glm::vec3& pos, const glm::vec2& coord) : position(pos), texCoord(coord) {}
+	};
 
 	struct Model {
 		Model() = default;
@@ -19,7 +35,7 @@ namespace wc {
 		void Load(const std::string& path, glm::vec4& start, glm::vec4& end) {
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_OptimizeMeshes | aiProcess_JoinIdenticalVertices | aiProcess_GenNormals | aiProcess_FlipUVs);
-
+			
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 			{
 				WC_ERROR(importer.GetErrorString());
@@ -29,7 +45,7 @@ namespace wc {
 			processNode(scene->mRootNode, *scene, offset);
 			start = glm::vec4(vertices[0].position, 1.f); 
 			end = glm::vec4(vertices[0].position, 1.f);
-
+			
 			for (uint32_t i = 1; i < vertices.size(); i++) {
 				start = glm::max(start, glm::vec4(vertices[i].position, 1.f));
 				end = glm::min(end, glm::vec4(vertices[i].position, 1.f));

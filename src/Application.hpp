@@ -62,7 +62,6 @@ namespace wc {
 				Renderer2D::DrawText("FPS: " + std::to_string((int)(1.f / deltaTime)) + " Frametime: " + std::to_string(deltaTime), font, {25.f, 5.f * scale * 10.f}, scale);
 				Renderer2D::DrawText("X: " + std::to_string(scene.camera.Position.x) + " Y: " + std::to_string(scene.camera.Position.y) + " Z: " + std::to_string(scene.camera.Position.z), font, { 25.f, 15.f * scale * 10.f }, scale);
 				Renderer2D::DrawText("Pitch: " + std::to_string(scene.camera.Pitch) + " Yaw: " + std::to_string(scene.camera.Yaw), font, { 25.f, 25.f * scale * 10.f }, scale);
-				Renderer2D::DrawText("Max bounces: " + std::to_string(scene.data->maxBounces), font, { 25.f, 35.f * scale * 10.f }, scale);
 			}
 			
 			Renderer2D::Flush();

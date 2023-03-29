@@ -2,12 +2,8 @@
 #include <wc/pch.hpp>
 #include <wc/Model/Model.hpp>
 #include <gl/Texture3D.h>
-#include "Chunk.h"
-
-#define NUM_LIGHTS 16
 
 namespace wc {
-	// @TODO: add method for adding meshes, transforms to them etc
 	struct SceneData
 	{
 		glm::vec3 lower_left_corner = glm::vec3(0.f);
@@ -15,12 +11,6 @@ namespace wc {
 		alignas(16) glm::vec3 vertical = glm::vec3(0.f);
 		alignas(16) glm::vec3 cameraPos = glm::vec3(0.f);
 		uint32_t numLights = 0;
-		uint32_t maxBounces = 1; // @TODO: remove
-	};
-
-	struct Light {
-		glm::vec3 vector = glm::vec3(0.f);
-		uint32_t color = 0;
 	};
 
 	struct DrawCommand {
@@ -29,20 +19,6 @@ namespace wc {
 		uint32_t firstIndex = 0;
 		uint32_t baseVertex = 0;
 		uint32_t bvhID = 0;
-	};	
-
-	enum class BloomMode
-	{
-		Prefilter,
-		Downsample,
-		UpsampleFirst,
-		Upsample
-	};
-
-	struct BloomBufferSettings {
-		glm::vec4 Params = glm::vec4(1.f); // (x) threshold, (y) threshold - knee, (z) knee * 2, (w) 0.25 / knee
-		float LOD = 0.f;
-		int Mode = (int)BloomMode::Prefilter;
 	};
 
 	uint32_t convertColor(const glm::vec4& color) {
@@ -68,7 +44,7 @@ namespace wc {
 		// Screen stuff
 		gl::Texture scrTexture;
 		gl::Texture finalImage;
-		gl::Texture bloomBuffers[3];
+		gl::Texture bloomBuffer;
 
 		// Materials
 		gl::Texture u_Albedo;
@@ -79,29 +55,23 @@ namespace wc {
 		gl::ComputeShader compositeShader;
 		gl::ComputeShader bloomShader;
 
+		struct AABB {
+			glm::vec4 start;
+			glm::vec4 end;
+		};
+
 		// Data pointers
-		Light* lighting = nullptr;
 		DrawCommand* cmds = nullptr;
 		AABB* bvhData = nullptr;
 
 		// Data gpu buffers
 		gl::UniformBuffer<SceneData> dataBuffer;
-		gl::UniformBuffer<BloomBufferSettings> bloomUBO;
-		gl::UniformBuffer<Light> lightBuffer;
 		gl::ShaderStorageBuffer<Vertex> vertexBuffer;
 		gl::ShaderStorageBuffer<uint32_t> indexBuffer;
 		gl::ShaderStorageBuffer<DrawCommand> drawCommandBuffer; // change this to mesh buffer
 		gl::ShaderStorageBuffer<AABB> bvhBuffer;
 
-		gl::ShaderStorageBuffer<Chunk> chunkBuffer;
-		//gl::Texture3D voxelData;
-		gl::ShaderStorageBuffer<uint8_t> voxelData;
-
-
 		Model model;
-		glm::vec3 sunAngle = glm::vec3(0.f);
-
-		Chunk* chunks = nullptr;
 	public:
 
 		SceneData* data = nullptr;
@@ -120,41 +90,14 @@ namespace wc {
 			uint32_t bits = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
 
 			dataBuffer.Create(bits);
-			lightBuffer.Create(bits, NUM_LIGHTS);
-			bloomUBO.Create(GL_DYNAMIC_STORAGE_BIT);
 			bvhBuffer.Create(bits);
 			drawCommandBuffer.Create(bits);
-			chunkBuffer.Create(bits, numChunks);
 
 			bvhData = bvhBuffer.Map(bits);
-			lighting = lightBuffer.Map(bits, NUM_LIGHTS);
 			data = dataBuffer.Map(bits);
 			cmds = drawCommandBuffer.Map(bits);
-			chunks = chunkBuffer.Map(bits, numChunks);
 
-			voxelData.Create(bits | GL_DYNAMIC_STORAGE_BIT, chunkVolume * numChunks);
-
-			uint8_t data[chunkSize][chunkSize][chunkSize];
-			memset(data, 0, sizeof(data));
-
-			for (int i = 0; i < numChunks; i++) {
-				chunks[i].pointerStart = i * chunkVolume;
-			}
-			for (int i = 0; i < numChunks; i++) {
-				for (uint32_t z = 0; z < chunkSize; z++) {
-					for (uint32_t x = 0; x < chunkSize; x++) {
-						for (uint8_t y = 0; y < chunkSize; y++) {
-							if (y == 0) data[x][y][z] = 1;
-						}
-					}
-				}
-
-				voxelData.SetData(chunkVolume, data, chunkVolume * i);
-			}
-
-
-
-			model.Load("assets/models/Murshroom.obj", bvhData[0].start, bvhData[0].end);
+			model.Load("assets/models/campfire.obj", bvhData[0].start, bvhData[0].end);
 
 			vertexBuffer.Create(bits, model.vertices.size());
 			indexBuffer.Create(bits, model.indices.size());
@@ -167,78 +110,18 @@ namespace wc {
 			memcpy(indices, model.indices.data(), sizeof(uint32_t) * model.indices.size());
 			indexBuffer.UnMap();
 
-			lightBuffer.BufferBase(1);
+			dataBuffer.BufferBase(0);
 			vertexBuffer.BufferBase(2);
 			indexBuffer.BufferBase(3);
 			drawCommandBuffer.BufferBase(4);
 			bvhBuffer.BufferBase(5);
-			chunkBuffer.BufferBase(6);
-			voxelData.BufferBase(7);
 
 			cmds[0].count = model.indices.size();
 			cmds[0].instanceCount = 1;
 
-			gl::load("assets/test/albedo.png", u_Albedo);
+			gl::load("assets/test/campfire.png", u_Albedo);
 			gl::load("assets/test/pbr_output.png", u_MaterialInfo);
 			camera.Position.y = 1.f;
-
-			addLight(glm::vec3(0.f, 1.f, 0.f), convertColor(glm::vec4(1.f, 1.f, 1.f, 0.f)));
-			//addLight(glm::vec3(0.f, 1.f/*0.665f*/, 0.f), convertColor(glm::vec4(166.f / 255.f, 1.f, 253.f / 256.f, 1.f)));
-		}
-
-		void RenderBloom()
-		{
-			bloomShader.Bind();
-			BloomBufferSettings settings;
-			settings.Params = glm::vec4(bloomSettings.Threshold, bloomSettings.Threshold - bloomSettings.Knee, bloomSettings.Knee * 2.f, 0.25f / bloomSettings.Knee);
-			bloomUBO.SetData(1, &settings);
-			bloomBuffers[0].BindImage(0);
-			scrTexture.Bind(1);
-			bloomBuffers[2].Bind(2);
-			bloomShader.Dispatch(glm::ceil(glm::vec2(bloomTexSize) / glm::vec2(m_BloomComputeWorkGroupSize)));
-
-			settings.Mode = (int)BloomMode::Downsample;
-			for (int currentMip = 1; currentMip < mips; currentMip++)
-			{
-				glm::vec2 dispatchSize = glm::ceil((glm::vec2)bloomBuffers[0].GetMipSize(currentMip) / glm::vec2(m_BloomComputeWorkGroupSize));
-
-				// Ping 
-				settings.LOD = float(currentMip - 1);
-				bloomUBO.SetData(1, &settings);
-
-				bloomBuffers[1].BindImage(0, currentMip);
-				if (currentMip == 1) bloomBuffers[0].Bind(1);
-				bloomShader.Dispatch(dispatchSize);
-
-				// Pong 
-				settings.LOD = float(currentMip);
-				bloomUBO.SetData(1, &settings);
-
-				bloomBuffers[0].BindImage(0, currentMip);
-				bloomBuffers[1].Bind(1);
-				bloomShader.Dispatch(dispatchSize);
-			}
-
-			// First Upsample		
-			settings.LOD = float(mips - 2);
-			settings.Mode = (int)BloomMode::UpsampleFirst;
-			bloomUBO.SetData(1, &settings);
-
-			bloomBuffers[2].BindImage(0, mips - 1);
-			bloomBuffers[0].Bind(1);
-
-			bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(mips - 1) / glm::vec2(m_BloomComputeWorkGroupSize)));
-
-			settings.Mode = (int)BloomMode::Upsample;
-			for (int currentMip = mips - 2; currentMip >= 0; currentMip--)
-			{
-				settings.LOD = float(currentMip);
-				bloomUBO.SetData(1, &settings);
-
-				bloomBuffers[2].BindImage(0, currentMip);
-
-				bloomShader.Dispatch(glm::ceil((glm::vec2)bloomBuffers[2].GetMipSize(currentMip) / glm::vec2(m_BloomComputeWorkGroupSize)));
-			}
 		}
 
 		void Update(const float& deltaTime) {
@@ -247,28 +130,18 @@ namespace wc {
 			data->cameraPos = camera.Position;
 			data->horizontal = camera.horizontal;
 			data->vertical = camera.vertical;
-			sunAngle.x += 6.f * deltaTime;
-			sunAngle.x = glm::mod(sunAngle.x, 360.f);
-			glm::vec3 sunVector = glm::vec3(0.f);
-			lighting[0].vector = -glm::vec3(glm::vec4(1.f, 0.f, 0.f, 0.f) * glm::rotate(glm::mat4(1.f), glm::radians(sunAngle.x), glm::vec3(0.f, 0.f, 1.f)));
-
-			dataBuffer.BufferBase(0);
 
 			scrTexture.BindImage(0);
 			u_Albedo.Bind(1);
 			u_MaterialInfo.Bind(2);
 
 			glm::vec2 dispatchSize = glm::ceil((glm::vec2)windSize / glm::vec2(m_BloomComputeWorkGroupSize));
-			//voxelData.Bind();
 			screenShader.Bind();
 			screenShader.Dispatch(dispatchSize);
 
-			bloomUBO.BufferBase(0);
-			RenderBloom();
-
 			finalImage.BindImage(0);
 			scrTexture.Bind(1); // use the color attachment texture as the texture of the quad plane	
-			bloomBuffers[2].Bind(2);
+			bloomBuffer.Bind(2);
 			compositeShader.Bind();
 			compositeShader.Dispatch(dispatchSize);
 
@@ -314,9 +187,6 @@ namespace wc {
 					camera.Position.y -= MovementSpeed;
 
 
-				if (Keyboard::getKey(Keyboard::Key::P)) data->maxBounces += 1;
-				if (Keyboard::getKey(Keyboard::Key::L)) data->maxBounces -= 1;
-
 				if (Keyboard::isKeyPressed(Keyboard::Key::C)) { camera.FOV = 10.f; MouseSensitivity = 18; }
 				else
 				{
@@ -352,31 +222,6 @@ namespace wc {
 			camera.Update();
 		}
 
-		uint32_t addLight(const glm::vec3& position, const uint32_t& color) {
-			uint32_t light = data->numLights;
-			if (data->numLights <= NUM_LIGHTS) {
-				lighting[data->numLights].vector = position;
-				lighting[data->numLights].color = color;
-				data->numLights++;
-			}
-			return light;
-		}
-
-		void removeLight(const glm::vec3& position) {
-			for (uint32_t i = 0u; i < data->numLights; i++)
-				if (lighting[i].vector == position) {
-					data->numLights--;
-					lighting[i] = lighting[data->numLights];
-					break;
-				}
-		}
-
-		struct BloomSettings
-		{
-			float Threshold = 1.f;
-			float Knee = 0.1f;
-		}bloomSettings;
-
 		Camera camera;
 
 		void CreateScreen() {
@@ -389,9 +234,7 @@ namespace wc {
 			scrProps.wrap_t = GL_CLAMP_TO_EDGE;
 			scrProps.SetSize(window.GetSize());
 			scrTexture.Create(scrProps);
-			scrTexture.SetName("scrTexture");
 			finalImage.Create(scrProps);
-			finalImage.SetName("finalImage");
 
 			bloomTexSize = glm::ivec2(scrProps.Width, scrProps.Height) / 2;
 			bloomTexSize += glm::ivec2(m_BloomComputeWorkGroupSize - bloomTexSize.x % m_BloomComputeWorkGroupSize, m_BloomComputeWorkGroupSize - bloomTexSize.y % m_BloomComputeWorkGroupSize);
@@ -399,22 +242,13 @@ namespace wc {
 			scrProps.mips = mips;
 
 			scrProps.SetSize(bloomTexSize);
-			for (int i = 0; i < 3; i++) {
-				bloomBuffers[i].Create(scrProps);
-				bloomBuffers[i].SetName("bloomBuffers[" + std::to_string(i) + "]");
-			}
+			bloomBuffer.Create(scrProps);
 		}
 
 		void DestroyScreen() {
 			scrTexture.Destroy();
 			finalImage.Destroy();
-
-			for (int i = 0; i < 3; i++)
-				bloomBuffers[i].Destroy();
-		}
-
-		void AddMesh() {
-
+			bloomBuffer.Destroy();
 		}
 	private:
 

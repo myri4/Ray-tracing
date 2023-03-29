@@ -21,21 +21,12 @@ struct AABB{
 struct Chunk {
 	vec4 start;
 	vec4 end;
-	ivec4 Position; // offset
-	uint pointerStart; // actual position
 };
 
 layout (std430, binding = 2) readonly buffer VertexData { Vertex vertices[]; };
 layout (std430, binding = 3) readonly buffer IndexData { uint indices[]; };
 layout (std430, binding = 4) readonly buffer DrawCommandData { DrawCommand drawCommands[]; };
 layout (std430, binding = 5) readonly buffer BVH { AABB boundingBoxes[]; };
-layout (std430, binding = 6) readonly buffer Chunks { Chunk chunks[]; };
-//layout (binding = 1, r8ui) uniform readonly uimage3D voxelData;
-layout (std430, binding = 7) readonly buffer Voxels { uint8_t voxelData[]; };
-
-uint getBlock(const in ivec3 pos){
-	return uint(voxelData[to1D(pos, chunkSize)]); //imageLoad(voxelData, vMapCheck).r;
-}
 
 vec3 Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in uint i, const in DrawCommand cmd) {
 	uint indexOffset = i + cmd.firstIndex;
@@ -59,7 +50,6 @@ vec3 Intersection(const in vec3 rayOrigin, const in vec3 rayDirection, const in 
 			return vec3(0.f, uv);	
 }
 
-// @TODO: fix, not working correctly, displays a box in a different position
 bool BoxIntersect(vec3 rayOrigin, vec3 invRayDir, vec3 boxMin, vec3 boxMax) {
     vec3 tMin = (boxMin - rayOrigin) * invRayDir;
     vec3 tMax = (boxMax - rayOrigin) * invRayDir;
@@ -74,5 +64,5 @@ bool BoxIntersect(vec3 rayOrigin, vec3 invRayDir, vec3 boxMin, vec3 boxMax) {
     vec3 t2 = max(tMin, tMax);
     float tNear = max(max(t1.x, t1.y), t1.z);
     float tFar = min(min(t2.x, t2.y), t2.z);
-    return tNear <= tFar;
+    return tNear <= tFar && tFar > 0.f;
 }

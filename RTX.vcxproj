@@ -201,7 +201,6 @@
     <ClInclude Include="common\Utils\Bits.hpp" />
     <ClInclude Include="common\wc\Model\Animation.hpp" />
     <ClInclude Include="common\wc\Model\Bone.hpp" />
-    <ClInclude Include="common\wc\Model\Mesh.hpp" />
     <ClInclude Include="common\wc\Model\Model.hpp" />
     <ClInclude Include="common\gl\Text.h" />
     <ClInclude Include="common\gl\Texture.h" />
@@ -230,7 +229,6 @@
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="common\Utilitiess\Log.h" />
-    <ClInclude Include="src\Scene\Chunk.h" />
     <ClInclude Include="src\Scene\Scene.h" />
     <ClInclude Include="Utils\SFMLCLock.hpp" />
     <ClInclude Include="Utils\State.h" />
