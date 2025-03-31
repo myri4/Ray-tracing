@@ -2,40 +2,37 @@
 
 #include <glad/glad.h>
 
-namespace gl {
-
+namespace gl
+{
     template<typename T>
-    class Buffer {
+    struct Buffer
+    {
     protected:
         GLuint m_RendererID = 0;
     public:
         Buffer() = default;
 
-        void Create(const GLsizeiptr& flags, const GLenum& size = 1, const void* data = nullptr) {
+        void Create(const GLsizeiptr& flags, const GLenum& size = 1, const void* data = nullptr)
+        {
             glCreateBuffers(1, &m_RendererID);
             glNamedBufferStorage(m_RendererID, size * sizeof(T), data, flags);
         }
 
         inline void Destroy() { glDeleteBuffers(1, &m_RendererID); }
 
-        void SetData(const GLsizeiptr& size, const void* data, const GLintptr& offset = 0) {
-            glNamedBufferSubData(m_RendererID, offset * sizeof(T), size * sizeof(T), data);
-        }
+        void SetData(const GLsizeiptr& size, const void* data, const GLintptr& offset = 0) { glNamedBufferSubData(m_RendererID, offset * sizeof(T), size * sizeof(T), data); }
 
-        T* Map(const GLenum& access, const uint32_t& length = 1, const uint32_t& offset = 0) {
-            return (T*)glMapNamedBufferRange(m_RendererID, offset * sizeof(T), length * sizeof(T), access);
-        }
+        T* Map(const GLenum& access, const uint32_t& length = 1, const uint32_t& offset = 0) { return (T*)glMapNamedBufferRange(m_RendererID, offset * sizeof(T), length * sizeof(T), access); }
 
-        bool UnMap() {
-            return glUnmapNamedBuffer(m_RendererID);
-        }
+        bool UnMap() {  return glUnmapNamedBuffer(m_RendererID); }
 
         inline operator GLuint& () { return m_RendererID; }
         inline operator const GLuint& () const { return m_RendererID; }
     };
 
     template<GLenum target, typename T>
-    struct IndexedBuffer : public Buffer<T> {
+    struct IndexedBuffer : public Buffer<T>
+    {
         IndexedBuffer() = default;
         IndexedBuffer(const void* data, const GLsizeiptr& size, const GLenum& flags) { this->Create(data, size, flags); }
 
