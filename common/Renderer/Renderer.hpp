@@ -1,9 +1,11 @@
 #pragma once
+
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <Utils/Log.hpp>
 
-void GLAPIENTRY OpenGLDebugMessege(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int length, const char* message, const void* userParam) {
+void GLAPIENTRY OpenGLDebugMessege(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int length, const char* message, const void* userParam)
+{
     const char* src;
     switch (source)
     {
@@ -35,26 +37,20 @@ void GLAPIENTRY OpenGLDebugMessege(uint32_t source, uint32_t type, uint32_t id, 
     }
 }
 
-namespace wc {
-    namespace Renderer {
-        
-        void DrawIndexed(const uint32_t& IndexCount, const uint32_t& mode = GL_TRIANGLES, const uint32_t& type = GL_UNSIGNED_INT, const void* indices = nullptr){
-            glDrawElements(mode, IndexCount, type, indices);
-        }
+namespace wc 
+{
+    namespace Renderer 
+    {
+        void DrawIndexed(const uint32_t& IndexCount, const uint32_t& mode = GL_TRIANGLES, const uint32_t& type = GL_UNSIGNED_INT, const void* indices = nullptr) { glDrawElements(mode, IndexCount, type, indices); }
 
-        void DrawArrays(const uint32_t& count, const uint32_t& first = 0, const uint32_t& mode = GL_TRIANGLES) {
-            glDrawArrays(mode, first, count);
-        }
+        void DrawArrays(const uint32_t& count, const uint32_t& first = 0, const uint32_t& mode = GL_TRIANGLES) { glDrawArrays(mode, first, count); }
 
-        void Clear(const GLbitfield& mask = GL_COLOR_BUFFER_BIT) {
-            glClear(mask);
-        }
+        void Clear(const GLbitfield& mask = GL_COLOR_BUFFER_BIT) { glClear(mask); }
 
-        void setClearColor(const glm::vec4& color) {
-            glClearColor(color.r, color.g, color.b, color.a);
-        }        
+        void setClearColor(const glm::vec4& color) { glClearColor(color.r, color.g, color.b, color.a); }        
 
-        void enableDebuging() {
+        void enableDebuging() 
+        {
             int flags;
             glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
             //if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) 
